@@ -47,10 +47,10 @@ class Database:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, video_id, title, transcript,
-                       ts_headline('english', transcript, to_tsquery(%s)) as highlight
+                       ts_headline('english', transcript, plainto_tsquery(%s)) as highlight
                 FROM transcripts
-                WHERE to_tsvector('english', transcript) @@ to_tsquery(%s)
-                ORDER BY ts_rank(to_tsvector('english', transcript), to_tsquery(%s)) DESC
+                WHERE to_tsvector('english', transcript) @@ plainto_tsquery(%s)
+                ORDER BY ts_rank(to_tsvector('english', transcript), plainto_tsquery(%s)) DESC
             """, (query, query, query))
             return cur.fetchall()
 
