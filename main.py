@@ -86,7 +86,7 @@ def list_transcripts() -> str:
     formatted_list = []
     for t in transcripts:
         formatted_list.append(
-            f"• <a href='javascript:void(0)' onclick='show_transcript(\"{t['video_id']}\")'>{t['title']}</a>\n"
+            f"• <span class='clickable-title' onclick='show_transcript(\"{t['video_id']}\")'>{t['title']}</span>\n"
             f"  Video ID: {t['video_id']}\n"
             f"  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}\n"
         )

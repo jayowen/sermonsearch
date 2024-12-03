@@ -41,3 +41,13 @@
     color: #888888;
     font-style: italic;
 }
+
+.clickable-title {
+    color: #00ff00;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.clickable-title:hover {
+    opacity: 0.8;
+}
