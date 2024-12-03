@@ -2,6 +2,7 @@ import os
 from googleapiclient.discovery import build
 import streamlit as st
 import time
+from psycopg2.extras import RealDictCursor
 from utils.command_parser import CommandParser
 from utils.database import Database
 from utils.transcript_processor import TranscriptProcessor
