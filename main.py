@@ -109,17 +109,19 @@ parser.register("help", lambda args: parser.get_help(),
 # Streamlit UI
 st.set_page_config(page_title="YouTube Transcript Processor", layout="wide")
 
-# Load custom CSS and add JavaScript
+# Load custom CSS
 with open("styles/custom.css") as f:
-    st.markdown(f"""
-        <style>{f.read()}</style>
-        <script>
-        function show_transcript(video_id) {{
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# Add JavaScript in the header
+st.markdown("""
+    <script type="text/javascript">
+        function show_transcript(video_id) {
             document.getElementById('command_input').value = 'transcript ' + video_id;
             document.getElementById('command_input').dispatchEvent(new Event('input'));
             document.querySelector('button[kind="primaryFormSubmit"]').click();
-        }}
-        </script>
+        }
+    </script>
     """, unsafe_allow_html=True)
 
 st.title("YouTube Transcript Processor")
