@@ -68,6 +68,15 @@ def search_transcripts(query: str) -> str:
         output.append(f"Highlight: {result['highlight']}\n")
     return "\n".join(output)
 
+def get_transcript(video_id: str) -> str:
+    """Get transcript content for a specific video."""
+    with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT title, transcript FROM transcripts WHERE video_id = %s", (video_id,))
+        result = cur.fetchone()
+        if result:
+            return f"## {result['title']}\n\n{result['transcript']}"
+        return "Transcript not found"
+
 def list_transcripts() -> str:
     """List all stored transcripts."""
     transcripts = db.get_all_transcripts()
@@ -76,9 +85,8 @@ def list_transcripts() -> str:
     
     formatted_list = []
     for t in transcripts:
-        video_url = f"https://youtube.com/watch?v={t['video_id']}"
         formatted_list.append(
-            f"• <a href='{video_url}' target='_blank'>{t['title']}</a>\n"
+            f"• <a href='javascript:void(0)' onclick='show_transcript(\"{t['video_id']}\")'>{t['title']}</a>\n"
             f"  Video ID: {t['video_id']}\n"
             f"  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}\n"
         )
@@ -93,15 +101,26 @@ parser.register("search", lambda args: search_transcripts(" ".join(args)),
                "search <query> - Search through stored transcripts")
 parser.register("list", lambda args: list_transcripts(),
                "list - Show all stored transcripts")
+parser.register("transcript", lambda args: get_transcript(args[0]),
+               "transcript <video_id> - Show transcript for a specific video")
 parser.register("help", lambda args: parser.get_help(),
                "help - Show available commands")
 
 # Streamlit UI
 st.set_page_config(page_title="YouTube Transcript Processor", layout="wide")
 
-# Load custom CSS
+# Load custom CSS and add JavaScript
 with open("styles/custom.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    st.markdown(f"""
+        <style>{f.read()}</style>
+        <script>
+        function show_transcript(video_id) {{
+            document.getElementById('command_input').value = 'transcript ' + video_id;
+            document.getElementById('command_input').dispatchEvent(new Event('input'));
+            document.querySelector('button[kind="primaryFormSubmit"]').click();
+        }}
+        </script>
+    """, unsafe_allow_html=True)
 
 st.title("YouTube Transcript Processor")
 
