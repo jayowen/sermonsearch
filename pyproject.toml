@@ -1,0 +1,12 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "google-api-python-client>=2.154.0",
+    "isodate>=0.7.2",
+    "psycopg2-binary>=2.9.10",
+    "streamlit>=1.40.2",
+    "youtube-transcript-api>=0.6.3",
+]

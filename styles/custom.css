@@ -1,0 +1,43 @@
+.terminal-container {
+    background-color: #1E1E1E;
+    border-radius: 5px;
+    padding: 20px;
+    font-family: 'Courier New', monospace;
+    border: 1px solid #00ff00;
+}
+
+.command-input {
+    background-color: #262730;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 10px;
+    font-family: 'Courier New', monospace;
+}
+
+.status-processing {
+    color: #00ff00;
+    animation: blink 1s infinite;
+}
+
+.status-error {
+    color: #ff0000;
+}
+
+.status-success {
+    color: #00ff00;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+.search-result {
+    border-left: 2px solid #00ff00;
+    padding-left: 10px;
+    margin: 10px 0;
+}
+
+.command-help {
+    color: #888888;
+    font-style: italic;
+}
