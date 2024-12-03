@@ -157,7 +157,7 @@ if st.session_state.show_transcript_id:
         st.markdown(transcript)
         if st.button("Close Transcript"):
             st.session_state.show_transcript_id = None
-            st.experimental_rerun()
+            st.rerun()
 
 # Help section
 with st.expander("Available Commands"):
