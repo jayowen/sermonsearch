@@ -47,7 +47,10 @@ def list_transcripts() -> str:
     if not transcripts:
         return "No transcripts stored"
     
-    return "\n".join([f"{t['title']} ({t['video_id']})" for t in transcripts])
+    formatted_list = []
+    for t in transcripts:
+        formatted_list.append(f"• {t['title']}\n  Video ID: {t['video_id']}\n  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}\n")
+    return "\n".join(formatted_list)
 
 # Register commands
 parser.register("process", lambda args: process_playlist(args[0]),
