@@ -9,7 +9,7 @@ class TranscriptProcessor:
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
             return " ".join([entry['text'] for entry in transcript_list])
         except Exception as e:
-            raise Exception(f"Failed to extract transcript: {str(e)}")
+            return ""  # Return empty string for videos without transcripts
 
     @staticmethod
     def format_transcript(transcript: str) -> str:

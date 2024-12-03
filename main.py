@@ -13,11 +13,19 @@ def process_playlist(url: str) -> str:
     """Process all videos in a playlist."""
     try:
         videos = YouTubeHelper.get_playlist_videos(url)
+        processed = 0
+        skipped = 0
+        
         for video in videos:
             transcript = TranscriptProcessor.extract_transcript(video['video_id'])
-            formatted_transcript = TranscriptProcessor.format_transcript(transcript)
-            db.store_transcript(video['video_id'], video['title'], formatted_transcript)
-        return f"Successfully processed {len(videos)} videos"
+            if transcript:
+                formatted_transcript = TranscriptProcessor.format_transcript(transcript)
+                db.store_transcript(video['video_id'], video['title'], formatted_transcript)
+                processed += 1
+            else:
+                skipped += 1
+                
+        return f"Processing complete:\n- Successfully processed: {processed} videos\n- Skipped (no subtitles): {skipped} videos"
     except Exception as e:
         return f"Error: {str(e)}"
 
