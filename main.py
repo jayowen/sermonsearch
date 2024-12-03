@@ -37,7 +37,8 @@ def search_transcripts(query: str) -> str:
     
     output = []
     for result in results:
-        output.append(f"Video: {result['title']}")
+        video_url = f"https://youtube.com/watch?v={result['video_id']}"
+        output.append(f"Video: <a href='{video_url}' target='_blank'>{result['title']}</a>")
         output.append(f"Highlight: {result['highlight']}\n")
     return "\n".join(output)
 
@@ -49,7 +50,12 @@ def list_transcripts() -> str:
     
     formatted_list = []
     for t in transcripts:
-        formatted_list.append(f"• {t['title']}\n  Video ID: {t['video_id']}\n  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}\n")
+        video_url = f"https://youtube.com/watch?v={t['video_id']}"
+        formatted_list.append(
+            f"• <a href='{video_url}' target='_blank'>{t['title']}</a>\n"
+            f"  Video ID: {t['video_id']}\n"
+            f"  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}\n"
+        )
     return "\n".join(formatted_list)
 
 # Register commands
