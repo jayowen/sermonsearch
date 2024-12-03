@@ -1,3 +1,5 @@
+import os
+from googleapiclient.discovery import build
 import streamlit as st
 import time
 from utils.command_parser import CommandParser
@@ -8,6 +10,30 @@ from utils.youtube_helper import YouTubeHelper
 # Initialize components
 db = Database()
 parser = CommandParser()
+
+def process_video(url: str) -> str:
+    """Process a single YouTube video."""
+    try:
+        video_id = TranscriptProcessor.extract_video_id(url)
+        transcript = TranscriptProcessor.extract_transcript(video_id)
+        
+        if not transcript:
+            return "Error: No subtitles available for this video"
+            
+        # Get video title using YouTube API
+        youtube = build('youtube', 'v3', developerKey=os.environ.get('YOUTUBE_API_KEY'))
+        response = youtube.videos().list(part='snippet', id=video_id).execute()
+        
+        if not response['items']:
+            return "Error: Video not found"
+            
+        title = response['items'][0]['snippet']['title']
+        formatted_transcript = TranscriptProcessor.format_transcript(transcript)
+        db.store_transcript(video_id, title, formatted_transcript)
+        
+        return f"Successfully processed video:\n- Title: {title}\n- Video ID: {video_id}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 def process_playlist(url: str) -> str:
     """Process all videos in a playlist."""
@@ -59,8 +85,10 @@ def list_transcripts() -> str:
     return "\n".join(formatted_list)
 
 # Register commands
-parser.register("process", lambda args: process_playlist(args[0]),
-               "process <playlist_url> - Process all videos in a YouTube playlist")
+parser.register("process-video", lambda args: process_video(args[0]),
+               "process-video <video_url> - Process a single YouTube video")
+parser.register("process-playlist", lambda args: process_playlist(args[0]),
+               "process-playlist <playlist_url> - Process all videos in a YouTube playlist")
 parser.register("search", lambda args: search_transcripts(" ".join(args)),
                "search <query> - Search through stored transcripts")
 parser.register("list", lambda args: list_transcripts(),
