@@ -5,13 +5,16 @@ from typing import List, Dict, Any
 
 class Database:
     def __init__(self):
-        self.conn = psycopg2.connect(
-            dbname=os.environ['PGDATABASE'],
-            user=os.environ['PGUSER'],
-            password=os.environ['PGPASSWORD'],
-            host=os.environ['PGHOST'],
-            port=os.environ['PGPORT']
-        )
+        try:
+            self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        except KeyError:
+            self.conn = psycopg2.connect(
+                dbname=os.environ['PGDATABASE'],
+                user=os.environ['PGUSER'],
+                password=os.environ['PGPASSWORD'],
+                host=os.environ['PGHOST'],
+                port=os.environ['PGPORT']
+            )
         self.setup_database()
 
     def setup_database(self):
