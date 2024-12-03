@@ -77,20 +77,22 @@ def get_transcript(video_id: str) -> str:
             return f"## {result['title']}\n\n{result['transcript']}"
         return "Transcript not found"
 
-def list_transcripts() -> str:
+def list_transcripts() -> None:
     """List all stored transcripts."""
     transcripts = db.get_all_transcripts()
     if not transcripts:
-        return "No transcripts stored"
+        st.write("No transcripts stored")
+        return
     
-    formatted_list = []
     for t in transcripts:
-        formatted_list.append(
-            f"• <span class='clickable-title' onclick='show_transcript(\"{t['video_id']}\")'>{t['title']}</span>\n"
-            f"  Video ID: {t['video_id']}\n"
-            f"  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}\n"
-        )
-    return "\n".join(formatted_list)
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.write(f"• {t['title']}")
+            st.text(f"  Video ID: {t['video_id']}")
+            st.text(f"  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}")
+        with col2:
+            if st.button("View Transcript", key=f"btn_{t['video_id']}"):
+                st.session_state.show_transcript_id = t['video_id']
 
 # Register commands
 parser.register("process-video", lambda args: process_video(args[0]),
@@ -113,16 +115,9 @@ st.set_page_config(page_title="YouTube Transcript Processor", layout="wide")
 with open("styles/custom.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Add JavaScript in the header
-st.markdown("""
-    <script type="text/javascript">
-        function show_transcript(video_id) {
-            document.getElementById('command_input').value = 'transcript ' + video_id;
-            document.getElementById('command_input').dispatchEvent(new Event('input'));
-            document.querySelector('button[kind="primaryFormSubmit"]').click();
-        }
-    </script>
-    """, unsafe_allow_html=True)
+# Initialize session state for transcript viewing
+if 'show_transcript_id' not in st.session_state:
+    st.session_state.show_transcript_id = None
 
 st.title("YouTube Transcript Processor")
 
@@ -136,19 +131,32 @@ if command:
         handler, args = parser.parse(command)
         with st.spinner("Processing..."):
             result = handler(args)
-        
-        # Display result in terminal-style container
-        st.markdown(
-            f"""
-            <div class="terminal-container">
-                <div class="command-input">> {command}</div>
-                <pre>{result}</pre>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+            
+            if command.startswith("list"):
+                # For list command, directly execute without terminal display
+                result
+            else:
+                # Display result in terminal-style container
+                st.markdown(
+                    f"""
+                    <div class="terminal-container">
+                        <div class="command-input">> {command}</div>
+                        <pre>{result}</pre>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
     except Exception as e:
         st.error(f"Error: {str(e)}")
+
+# Handle transcript viewing from session state
+if st.session_state.show_transcript_id:
+    with st.spinner("Loading transcript..."):
+        transcript = get_transcript(st.session_state.show_transcript_id)
+        st.markdown(transcript)
+        if st.button("Close Transcript"):
+            st.session_state.show_transcript_id = None
+            st.experimental_rerun()
 
 # Help section
 with st.expander("Available Commands"):
