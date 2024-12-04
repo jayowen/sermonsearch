@@ -183,8 +183,14 @@ with st.sidebar:
         st.session_state.current_command = "search"
     if st.button("📋 List All Transcripts", use_container_width=True):
         st.session_state.current_command = "list"
-    if st.button("📊 Analyze Transcript", use_container_width=True):
+    if st.button("📊 Basic Analysis", use_container_width=True):
         st.session_state.current_command = "analyze"
+    if st.button("📈 Word Frequency", use_container_width=True):
+        st.session_state.current_command = "word_frequency"
+    if st.button("🔑 Key Phrases", use_container_width=True):
+        st.session_state.current_command = "key_phrases"
+    if st.button("⏱️ Time Segments", use_container_width=True):
+        st.session_state.current_command = "time_segments"
     if st.button("🔄 Compare Transcripts", use_container_width=True):
         st.session_state.current_command = "compare"
     if st.button("💾 Export Data", use_container_width=True):
@@ -462,6 +468,90 @@ elif st.session_state.current_command == "compare":
     if st.button("← Back to List"):
         st.session_state.current_command = "list"
         st.rerun()
+elif st.session_state.current_command == "word_frequency":
+    st.subheader("Word Frequency Analysis")
+    transcripts = db.get_all_transcripts()
+    
+    if not transcripts:
+        st.info("No transcripts available for analysis")
+    else:
+        selected = st.selectbox(
+            "Select a transcript to analyze",
+            options=[(t['id'], t['title']) for t in transcripts],
+            format_func=lambda x: x[1],
+            key="word_freq"
+        )
+        
+        min_count = st.slider("Minimum word occurrence", 2, 20, 5)
+        
+        if selected:
+            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
+            if transcript:
+                word_freq = parser.get_word_frequency(transcript['transcript'], min_count)
+                
+                if word_freq:
+                    st.write("### Word Frequency Distribution")
+                    freq_data = {word: count for word, count in word_freq}
+                    st.bar_chart(freq_data)
+                else:
+                    st.info("No words meet the minimum frequency threshold")
+
+elif st.session_state.current_command == "key_phrases":
+    st.subheader("Key Phrases Analysis")
+    transcripts = db.get_all_transcripts()
+    
+    if not transcripts:
+        st.info("No transcripts available for analysis")
+    else:
+        selected = st.selectbox(
+            "Select a transcript to analyze",
+            options=[(t['id'], t['title']) for t in transcripts],
+            format_func=lambda x: x[1],
+            key="phrases"
+        )
+        
+        if selected:
+            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
+            if transcript:
+                col1, col2 = st.columns(2)
+                with col1:
+                    min_words = st.slider("Min words in phrase", 2, 5, 3)
+                with col2:
+                    max_words = st.slider("Max words in phrase", 3, 8, 6)
+                
+                phrases = parser.find_key_phrases(transcript['transcript'], min_words, max_words)
+                if phrases:
+                    st.write("### Most Common Phrases")
+                    for phrase, count in phrases:
+                        st.markdown(f"- **{phrase}** ({count} occurrences)")
+                else:
+                    st.info("No key phrases found with current settings")
+
+elif st.session_state.current_command == "time_segments":
+    st.subheader("Time-based Segments")
+    transcripts = db.get_all_transcripts()
+    
+    if not transcripts:
+        st.info("No transcripts available for segmentation")
+    else:
+        selected = st.selectbox(
+            "Select a transcript to segment",
+            options=[(t['id'], t['title']) for t in transcripts],
+            format_func=lambda x: x[1],
+            key="segments"
+        )
+        
+        if selected:
+            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
+            if transcript:
+                words_per_segment = st.slider("Words per segment", 100, 500, 300)
+                segments = parser.extract_time_segments(transcript['transcript'], words_per_segment)
+                
+                st.write(f"### Transcript Segments ({len(segments)} total)")
+                for i, segment in enumerate(segments, 1):
+                    with st.expander(f"Segment {i}"):
+                        st.write(segment)
+
 else:
     if not st.session_state.current_command:
         st.info("👈 Select a command from the sidebar to get started")

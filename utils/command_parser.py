@@ -68,13 +68,69 @@ class CommandParser:
         }
 
     @staticmethod
-    def extract_keywords(text: str, top_n: int = 10) -> List[Tuple[str, int]]:
+    def extract_keywords(text: str, top_n: int = 10, min_length: int = 3) -> List[Tuple[str, int]]:
         """Extract the most frequent meaningful words as keywords."""
         words = word_tokenize(text.lower())
         stop_words = set(stopwords.words('english'))
-        words = [w for w in words if w.isalnum() and w not in stop_words]
+        # Filter words: must be alphanumeric, not in stop words, and longer than min_length
+        words = [w for w in words if w.isalnum() and w not in stop_words and len(w) >= min_length]
         
         return Counter(words).most_common(top_n)
+
+    @staticmethod
+    def get_word_frequency(text: str, min_count: int = 2) -> List[Tuple[str, int]]:
+        """Get word frequency analysis with minimum count filter."""
+        words = word_tokenize(text.lower())
+        stop_words = set(stopwords.words('english'))
+        words = [w for w in words if w.isalnum() and w not in stop_words]
+        freq = Counter(words)
+        return [(word, count) for word, count in freq.items() if count >= min_count]
+
+    @staticmethod
+    def extract_time_segments(transcript_text: str, segment_length: int = 300) -> List[str]:
+        """Split transcript into time-based segments."""
+        words = transcript_text.split()
+        segments = []
+        current_segment = []
+        word_count = 0
+        
+        for word in words:
+            current_segment.append(word)
+            word_count += 1
+            
+            if word_count >= segment_length:
+                segments.append(" ".join(current_segment))
+                current_segment = []
+                word_count = 0
+        
+        if current_segment:
+            segments.append(" ".join(current_segment))
+            
+        return segments
+
+    @staticmethod
+    def find_key_phrases(text: str, min_words: int = 3, max_words: int = 6) -> List[Tuple[str, int]]:
+        """Extract key phrases from the transcript."""
+        sentences = sent_tokenize(text)
+        stop_words = set(stopwords.words('english'))
+        phrases = []
+        
+        for sentence in sentences:
+            words = word_tokenize(sentence)
+            current_phrase = []
+            
+            for word in words:
+                if word.isalnum() and word.lower() not in stop_words:
+                    current_phrase.append(word)
+                else:
+                    if min_words <= len(current_phrase) <= max_words:
+                        phrases.append(" ".join(current_phrase))
+                    current_phrase = []
+            
+            if min_words <= len(current_phrase) <= max_words:
+                phrases.append(" ".join(current_phrase))
+                
+        return Counter(phrases).most_common(10)
 
     @staticmethod
     def summarize_text(text: str, max_length: int = None) -> str:
