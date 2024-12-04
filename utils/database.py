@@ -169,3 +169,9 @@ class Database:
             cur.execute("SELECT id, title FROM transcripts WHERE video_id = %s", (video_id,))
             return cur.fetchone()
 
+    def get_transcript(self, video_id: str) -> Dict[str, Any]:
+        """Get a single transcript by video_id."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM transcripts WHERE video_id = %s", (video_id,))
+            return cur.fetchone()
+
