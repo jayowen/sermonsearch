@@ -183,6 +183,8 @@ with st.sidebar:
         st.session_state.current_command = "search"
     if st.button("📋 List All Transcripts", use_container_width=True):
         st.session_state.current_command = "list"
+    if st.button("💾 Export Data", use_container_width=True):
+        st.session_state.current_command = "export"
     
     st.markdown("---")
     with st.expander("ℹ️ Command Help"):
@@ -273,7 +275,7 @@ elif st.session_state.current_command == "list":
                 if st.button("View Details", key=f"btn_{t['video_id']}", use_container_width=True):
                     st.session_state.show_transcript_id = t['video_id']
                     st.session_state.current_command = "view_video"
-                    st.experimental_rerun()
+                    st.rerun()
 
 # Handle video viewing
 if st.session_state.current_command == "view_video" and st.session_state.show_transcript_id:
@@ -317,8 +319,37 @@ if st.session_state.current_command == "view_video" and st.session_state.show_tr
                 # Back button
                 if st.button("← Back to List"):
                     st.session_state.show_transcript_id = None
-                    st.session_state.current_command = "list"
-                    st.rerun()
+
+elif st.session_state.current_command == "export":
+    st.subheader("Export Transcripts")
+    export_format = st.selectbox(
+        "Select export format",
+        ["json", "csv", "txt"],
+        help="Choose the format for exporting your transcripts"
+    )
+    
+    if st.button("Export", key="export_btn"):
+        try:
+            data = db.export_transcripts(format=export_format)
+            if data:
+                st.download_button(
+                    label=f"Download {export_format.upper()} File",
+                    data=data,
+                    file_name=f"transcripts.{export_format}",
+                    mime={
+                        'json': 'application/json',
+                        'csv': 'text/csv',
+                        'txt': 'text/plain'
+                    }[export_format]
+                )
+            else:
+                st.info("No transcripts available to export")
+        except Exception as e:
+            st.error(f"Error exporting data: {str(e)}")
+            
+    if st.button("← Back to List"):
+        st.session_state.current_command = "list"
+        st.rerun()
 else:
     if not st.session_state.current_command:
         st.info("👈 Select a command from the sidebar to get started")
