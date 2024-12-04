@@ -64,14 +64,14 @@ class Database:
 
     def get_categories(self, video_id: str) -> Dict[str, list]:
         """Get categories for a transcript."""
+        categories = {
+            'christian_life': [],
+            'church_ministry': [],
+            'theology': []
+        }
+        
         try:
             result = self.supabase.table('categories').select('*').eq('video_id', video_id).execute()
-            
-            categories = {
-                'christian_life': [],
-                'church_ministry': [],
-                'theology': []
-            }
             
             if result.data:
                 data = result.data[0]
