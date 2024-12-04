@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from utils.database import Database
+from psycopg2.extras import RealDictCursor
 from utils.youtube_helper import YouTubeHelper
 from utils.transcript_processor import TranscriptProcessor
 from utils.command_parser import CommandParser
