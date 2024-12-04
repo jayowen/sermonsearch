@@ -91,9 +91,27 @@ if st.session_state.current_command == "process":
                             st.rerun()
                     with col2:
                         if st.button("Re-process"):
-                            transcript = processor.extract_transcript(video_id)
-                            if not transcript:
-                                st.error("No transcript available for this video.")
+                            try:
+                                transcript = processor.extract_transcript(video_id)
+                                if not transcript:
+                                    st.error("No transcript available for this video.")
+                                    st.stop()
+                                    
+                                # Generate AI summary
+                                with st.spinner("Generating AI summary..."):
+                                    from utils.command_parser import CommandParser
+                                    parser = CommandParser()
+                                    ai_summary = parser.summarize_text(transcript, max_length=250)
+                                
+                                # Store in database with summary
+                                db.store_transcript(video_id, existing_video['title'], transcript, ai_summary)
+                                st.success("Transcript re-processed successfully!")
+                                # Redirect to video view
+                                st.session_state.show_transcript_id = video_id
+                                st.session_state.current_command = "view_video"
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error re-processing video: {str(e)}")
                                 st.stop()
                 else:
                     transcript = processor.extract_transcript(video_id)
