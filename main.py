@@ -222,21 +222,53 @@ elif st.session_state.current_command == "list":
             with col2:
                 if st.button("View", key=f"btn_{t['video_id']}"):
                     st.session_state.show_transcript_id = t['video_id']
+                    st.session_state.current_command = "view_video"
                     st.rerun()
 
-# Handle transcript viewing
-if st.session_state.show_transcript_id:
-    with st.spinner("Loading transcript..."):
-        transcript_text = get_transcript(st.session_state.show_transcript_id)
-        st.markdown(
-            f"""<div class="transcript-viewer">
-                {transcript_text}
-            </div>""",
-            unsafe_allow_html=True
-        )
-        if st.button("Close Transcript"):
-            st.session_state.show_transcript_id = None
-            st.rerun()
+# Handle video viewing
+if st.session_state.current_command == "view_video" and st.session_state.show_transcript_id:
+    with st.spinner("Loading video and transcript..."):
+        # Get video details
+        with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT title, transcript FROM transcripts WHERE video_id = %s", 
+                       (st.session_state.show_transcript_id,))
+            result = cur.fetchone()
+            
+            if result:
+                # Display video title
+                st.title(result['title'])
+                
+                # Embed YouTube video
+                video_url = f"https://www.youtube.com/embed/{st.session_state.show_transcript_id}"
+                st.markdown(
+                    f"""
+                    <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin-bottom: 20px;">
+                        <iframe 
+                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                            src="{video_url}"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen
+                        ></iframe>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+                # Display transcript
+                st.markdown("### Transcript")
+                st.markdown(
+                    f"""<div class="transcript-viewer">
+                        {result['transcript']}
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+                
+                # Back button
+                if st.button("← Back to List"):
+                    st.session_state.show_transcript_id = None
+                    st.session_state.current_command = "list"
+                    st.rerun()
 else:
     if not st.session_state.current_command:
         st.info("👈 Select a command from the sidebar to get started")
