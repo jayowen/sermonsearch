@@ -387,31 +387,26 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                     'theology': []
                 }
                 
-                # Create columns for each category type
-                col1, col2, col3 = st.columns(3)
+                # Display categories vertically
+                st.markdown("**The Christian Life**")
+                selected_christian = st.multiselect(
+                    "Select Christian Life categories",
+                    options=CHRISTIAN_LIFE_CATEGORIES,
+                    default=current_categories.get('christian_life', [])
+                )
                 
-                with col1:
-                    st.markdown("**The Christian Life**")
-                    selected_christian = st.multiselect(
-                        "Select Christian Life categories",
-                        options=CHRISTIAN_LIFE_CATEGORIES,
-                        default=current_categories.get('christian_life', [])
-                    )
+                st.markdown("**Church & Ministry**")
+                selected_ministry = st.multiselect(
+                    "Select Church & Ministry categories",
+                    options=CHURCH_MINISTRY_CATEGORIES,
+                    default=current_categories.get('church_ministry', [])
+                )
                 
-                with col2:
-                    st.markdown("**Church & Ministry**")
-                    selected_ministry = st.multiselect(
-                        "Select Church & Ministry categories",
-                        options=CHURCH_MINISTRY_CATEGORIES,
-                        default=current_categories.get('church_ministry', [])
-                    )
-                
-                with col3:
-                    st.markdown("**Theology**")
-                    selected_theology = st.multiselect(
-                        "Select Theology categories",
-                        options=THEOLOGY_CATEGORIES,
-                        default=current_categories.get('theology', [])
+                st.markdown("**Theology**")
+                selected_theology = st.multiselect(
+                    "Select Theology categories",
+                    options=THEOLOGY_CATEGORIES,
+                    default=current_categories.get('theology', [])
                     )
                 
                 # Create a callback to handle category changes
