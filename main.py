@@ -97,7 +97,11 @@ if st.session_state.current_command == "process":
                     
                     # Store in database with summary
                     db.store_transcript(video_id, video_title, transcript, ai_summary)
-                    st.success("Transcript processed and AI summary generated successfully!")
+                    st.success("Transcript processed successfully!")
+                    # Redirect to video view
+                    st.session_state.show_transcript_id = video_id
+                    st.session_state.current_command = "view_video"
+                    st.rerun()
                 else:
                     st.error("No transcript available for this video.")
             except Exception as e:
@@ -183,7 +187,7 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
     with st.spinner("Loading video and transcript..."):
         # Get video details
         with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT title, transcript FROM transcripts WHERE video_id = %s", 
+            cur.execute("SELECT title, transcript, ai_summary FROM transcripts WHERE video_id = %s", 
                        (st.session_state.show_transcript_id,))
             result = cur.fetchone()
             
@@ -208,8 +212,34 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                     unsafe_allow_html=True
                 )
                 
+                # Display AI Summary if available
+                if result.get('ai_summary'):
+                    st.markdown("### AI Summary")
+                    st.markdown(
+                        f"""<div class="transcript-viewer">
+                            {result['ai_summary']}
+                        </div>""",
+                        unsafe_allow_html=True
+                    )
+
+                # Display key statistics
+                st.markdown("### Key Statistics")
+                stats = parser.get_word_stats(result['transcript'])
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Word Count", stats['word_count'])
+                    st.metric("Sentence Count", stats['sentence_count'])
+                with col2:
+                    st.metric("Unique Words", stats['unique_words'])
+                    st.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
+
+                # Display keywords
+                st.markdown("### Top Keywords")
+                keywords = parser.extract_keywords(result['transcript'])
+                st.bar_chart({word: count for word, count in keywords})
+
                 # Display transcript
-                st.markdown("### Transcript")
+                st.markdown("### Full Transcript")
                 st.markdown(
                     f"""<div class="transcript-viewer">
                         {result['transcript']}
