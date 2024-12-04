@@ -82,10 +82,10 @@ if st.session_state.current_command == "process":
                     st.info(f"This video '{existing_video['title']}' is already in the system.")
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("View Existing"):
-                            st.session_state.show_transcript_id = video_id
-                            st.session_state.current_command = "view_video"
-                            st.experimental_rerun()
+                        if st.button("View Existing", key="view_existing_btn"):
+                            st.session_state["show_transcript_id"] = video_id
+                            st.session_state["current_command"] = "view_video"
+                            st.rerun()
                     with col2:
                         if st.button("Re-process"):
                             try:
