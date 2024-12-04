@@ -348,6 +348,37 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
             with categories_tab:
                 st.markdown("### Categories")
                 
+                # Add debug expander at the top
+                with st.expander("🔍 Categories Debug Information"):
+                    st.markdown("### Current Categories in Database")
+                    st.json(categories)
+                    
+                    st.markdown("### Category Lists")
+                    st.markdown("**Christian Life Categories:**")
+                    st.write(CHRISTIAN_LIFE_CATEGORIES)
+                    st.markdown("**Church & Ministry Categories:**")
+                    st.write(CHURCH_MINISTRY_CATEGORIES)
+                    st.markdown("**Theology Categories:**")
+                    st.write(THEOLOGY_CATEGORIES)
+                    
+                    if hasattr(st.session_state, 'categories_debug'):
+                        debug = st.session_state.categories_debug
+                        
+                        st.markdown("### AI Processing Information")
+                        st.markdown("#### Input")
+                        st.write(f"Transcript Length: {len(debug.get('input_transcript', ''))} characters")
+                        
+                        st.markdown("#### AI Response")
+                        st.json(debug.get('ai_response', {}))
+                        
+                        st.markdown("#### Parsed Categories")
+                        st.json(debug.get('parsed_categories', {}))
+                        
+                        if debug.get('errors'):
+                            st.markdown("#### Errors")
+                            for error in debug['errors']:
+                                st.error(error)
+                
                 # Get current categories
                 current_categories = categories if categories else {
                     'christian_life': [],

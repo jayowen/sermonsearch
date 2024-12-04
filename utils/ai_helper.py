@@ -114,10 +114,30 @@ Here's the transcript to analyze:
                 'theology': [cat for cat in categories.get('theology', []) if cat in THEOLOGY_CATEGORIES]
             }
             
+            # Store debug information
+            debug_info = {
+                'input_transcript': text[:1000] + '...' if len(text) > 1000 else text,  # First 1000 chars for brevity
+                'ai_response': response_text,
+                'parsed_categories': validated_categories,
+                'errors': []
+            }
+            st.session_state.categories_debug = debug_info
+            
             return validated_categories
             
         except Exception as e:
-            print(f"Error categorizing transcript: {str(e)}")
+            error_msg = str(e)
+            print(f"Error categorizing transcript: {error_msg}")
+            
+            # Store error information
+            debug_info = {
+                'input_transcript': text[:1000] + '...' if len(text) > 1000 else text,
+                'ai_response': None,
+                'parsed_categories': None,
+                'errors': [error_msg]
+            }
+            st.session_state.categories_debug = debug_info
+            
             return {
                 'christian_life': [],
                 'church_ministry': [],
