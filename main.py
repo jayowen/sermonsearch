@@ -94,12 +94,12 @@ if st.session_state.current_command == "process":
                             transcript = processor.extract_transcript(video_id)
                             if not transcript:
                                 st.error("No transcript available for this video.")
-                                return
+                                st.stop()
                 else:
                     transcript = processor.extract_transcript(video_id)
                     if not transcript:
                         st.error("No transcript available for this video.")
-                        return
+                        st.stop()
                 
                 if transcript:
                     # Generate AI summary
