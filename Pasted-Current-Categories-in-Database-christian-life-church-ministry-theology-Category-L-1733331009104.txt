@@ -1,0 +1,131 @@
+Current Categories in Database
+{
+"christian_life":[]
+"church_ministry":[]
+"theology":[]
+}
+Category Lists
+Christian Life Categories:
+
+[
+0:"Abortion"
+1:"Abuse"
+2:"Adoption"
+3:"Anger"
+4:"Anxiety"
+5:"Community"
+6:"Current Events"
+7:"Dating"
+8:"Death"
+9:"Discipline"
+10:"Divorce"
+11:"Education"
+12:"Fatherhood"
+13:"Fear"
+14:"Finances"
+15:"Forgiveness"
+16:"Gender"
+17:"Holiness"
+18:"Hypocrisy"
+19:"Identity"
+20:"Idolatry"
+21:"Joy"
+22:"Marriage"
+23:"Motherhood"
+24:"Peace"
+25:"Politics"
+26:"Pride"
+27:"Purity"
+28:"Race"
+29:"Relationships"
+30:"Rest"
+31:"Sexuality"
+32:"Singleness"
+33:"Suffering"
+34:"Suicide"
+35:"Technology"
+36:"Wisdom"
+37:"Work"
+]
+Church & Ministry Categories:
+
+[
+0:"Adults"
+1:"Baptism"
+2:"Care"
+3:"Church"
+4:"Church Planting"
+5:"Church-Planting"
+6:"Connections"
+7:"Disciple Groups"
+8:"Discipleship"
+9:"Faith"
+10:"Family Discipleship"
+11:"Fasting"
+12:"Giving"
+13:"Global Missions"
+14:"Grace"
+15:"Kids"
+16:"Leadership"
+17:"Local Missions"
+18:"Men"
+19:"Missional Living"
+20:"Missions"
+21:"Multisite"
+22:"Persecution"
+23:"Prayer"
+24:"School of Ministry"
+25:"Serving"
+26:"Students"
+27:"The Church of Eleven22"
+28:"Women"
+29:"World Religions"
+30:"Worship"
+]
+Theology Categories:
+
+[
+0:"Creation"
+1:"End Times"
+2:"False Teaching"
+3:"Heaven and Hell"
+4:"Revelation"
+5:"Salvation"
+6:"Sanctification"
+7:"Sin"
+8:"Sound Doctrine"
+9:"Spiritual Gifts"
+10:"Spiritual Warfare"
+11:"The Bible"
+12:"The Birth of Christ"
+13:"The Character of God"
+14:"The Death of Christ"
+15:"The Fall"
+16:"The Gathering"
+17:"The Gospel"
+18:"The Holy Spirit"
+19:"The Kingdom of God"
+20:"The Law"
+21:"The Lord's Supper"
+22:"The Ministry of Christ"
+23:"The Resurrection of Christ"
+24:"The Return of Christ"
+25:"The Sovereignty of God"
+26:"Theology"
+27:"Trinitarianism"
+28:"Union with Christ"
+]
+AI Processing Information
+Input
+Transcript Length: 1003 characters
+
+AI Response
+"ERROR":{
+"message":"src property must be a valid json object"
+}
+Parsed Categories
+"ERROR":{
+"message":"src property must be a valid json object"
+}
+Errors
+Expecting ',' delimiter: line 23 column 5 (char 453)

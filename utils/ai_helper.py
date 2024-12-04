@@ -1,6 +1,8 @@
 import os
 import anthropic
-from typing import Optional
+from typing import Optional, Dict, Any, List
+import json
+import re
 
 class AIHelper:
     def __init__(self):
@@ -42,14 +44,52 @@ class AIHelper:
         except Exception as e:
             print(f"Error generating AI summary: {str(e)}")
             return f"Error generating summary: {str(e)}"
-    def categorize_transcript(self, text: str) -> dict:
+
+    def categorize_transcript(self, text: str) -> Dict[str, Any]:
         """Categorize the transcript into predefined categories."""
         try:
+            # Define category lists here to avoid circular imports
+            CHRISTIAN_LIFE_CATEGORIES = [
+                "Abortion", "Abuse", "Adoption", "Anger", "Anxiety", "Community", "Current Events",
+                "Dating", "Death", "Discipline", "Divorce", "Education", "Fatherhood", "Fear",
+                "Finances", "Forgiveness", "Gender", "Holiness", "Hypocrisy", "Identity", "Idolatry",
+                "Joy", "Marriage", "Motherhood", "Peace", "Politics", "Pride", "Purity", "Race",
+                "Relationships", "Rest", "Sexuality", "Singleness", "Suffering", "Suicide",
+                "Technology", "Wisdom", "Work"
+            ]
+            
+            CHURCH_MINISTRY_CATEGORIES = [
+                "Adults", "Baptism", "Care", "Church", "Church Planting", "Church-Planting",
+                "Connections", "Disciple Groups", "Discipleship", "Faith", "Family Discipleship",
+                "Fasting", "Giving", "Global Missions", "Grace", "Kids", "Leadership",
+                "Local Missions", "Men", "Missional Living", "Missions", "Multisite", "Persecution",
+                "Prayer", "School of Ministry", "Serving", "Students", "The Church of Eleven22",
+                "Women", "World Religions", "Worship"
+            ]
+            
+            THEOLOGY_CATEGORIES = [
+                "Creation", "End Times", "False Teaching", "Heaven and Hell", "Revelation",
+                "Salvation", "Sanctification", "Sin", "Sound Doctrine", "Spiritual Gifts",
+                "Spiritual Warfare", "The Bible", "The Birth of Christ", "The Character of God",
+                "The Death of Christ", "The Fall", "The Gathering", "The Gospel", "The Holy Spirit",
+                "The Kingdom of God", "The Law", "The Lord's Supper", "The Ministry of Christ",
+                "The Resurrection of Christ", "The Return of Christ", "The Sovereignty of God",
+                "Theology", "Trinitarianism", "Union with Christ"
+            ]
+            
             if not text or len(text.strip()) < 10:
                 return {
-                    'christian_life': [],
-                    'church_ministry': [],
-                    'theology': []
+                    'categories': {
+                        'christian_life': [],
+                        'church_ministry': [],
+                        'theology': []
+                    },
+                    'debug': {
+                        'input_transcript': text,
+                        'ai_response': None,
+                        'parsed_categories': None,
+                        'errors': ['Text too short to process']
+                    }
                 }
 
             # Limit text length to prevent token overflow
@@ -69,8 +109,7 @@ Adults, Baptism, Care, Church, Church Planting, Church-Planting, Connections, Di
 3. Theology - Choose from:
 Creation, End Times, False Teaching, Heaven and Hell, Revelation, Salvation, Sanctification, Sin, Sound Doctrine, Spiritual Gifts, Spiritual Warfare, The Bible, The Birth of Christ, The Character of God, The Death of Christ, The Fall, The Gathering, The Gospel, The Holy Spirit, The Kingdom of God, The Law, The Lord's Supper, The Ministry of Christ, The Resurrection of Christ, The Return of Christ, The Sovereignty of God, Theology, Trinitarianism, Union with Christ
 
-Only select categories that are explicitly mentioned or strongly implied in the transcript. Format your response as a JSON object with three arrays containing ONLY categories from the above lists.
-Example format:
+Only select categories that are explicitly mentioned or strongly implied in the transcript. Format your response as a JSON object with three arrays containing ONLY categories from the above lists, like this:
 {
     "christian_life": ["Marriage", "Community"],
     "church_ministry": ["Discipleship"],
@@ -86,41 +125,50 @@ Here's the transcript to analyze:
                 model="claude-3-haiku-20240307",
                 max_tokens=1024,
                 temperature=0.7,
-                system="You are an expert at analyzing sermon transcripts and categorizing them accurately. Return only valid categories from the predefined lists in a JSON format.",
+                system="You are an expert at analyzing sermon transcripts and categorizing them accurately. Return only valid categories from the predefined lists in a strict JSON format.",
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
             )
             
-            # Parse the response as JSON
-            response_text = message.content[0].text
-            # Extract JSON part if there's additional text
-            import json
-            import re
+            # Get the response text
+            response_text = message.content[0].text.strip()
             
-            # Find JSON-like structure in the response
-            json_match = re.search(r'\{[^}]+\}', response_text)
-            if json_match:
-                response_text = json_match.group(0)
-            
-            categories = json.loads(response_text)
-            
-            # Validate categories against predefined lists
-            from main import CHRISTIAN_LIFE_CATEGORIES, CHURCH_MINISTRY_CATEGORIES, THEOLOGY_CATEGORIES
-            
-            validated_categories = {
-                'christian_life': [cat for cat in categories.get('christian_life', []) if cat in CHRISTIAN_LIFE_CATEGORIES],
-                'church_ministry': [cat for cat in categories.get('church_ministry', []) if cat in CHURCH_MINISTRY_CATEGORIES],
-                'theology': [cat for cat in categories.get('theology', []) if cat in THEOLOGY_CATEGORIES]
-            }
-            
-            # Create debug information
+            # Initialize debug info
             debug_info = {
-                'input_transcript': text[:1000] + '...' if len(text) > 1000 else text,  # First 1000 chars for brevity
+                'input_transcript': text[:1000] + '...' if len(text) > 1000 else text,
                 'ai_response': response_text,
-                'parsed_categories': validated_categories,
+                'parsed_categories': None,
                 'errors': []
             }
+            
+            try:
+                # First try direct JSON parsing
+                categories = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                # If direct parsing fails, try to extract JSON structure
+                json_match = re.search(r'\{[\s\S]*?\}(?=\s*$)', response_text)
+                if json_match:
+                    try:
+                        categories = json.loads(json_match.group(0))
+                    except json.JSONDecodeError:
+                        debug_info['errors'].append(f"Failed to parse JSON: {str(e)}")
+                        categories = {"christian_life": [], "church_ministry": [], "theology": []}
+                else:
+                    debug_info['errors'].append("No valid JSON structure found in response")
+                    categories = {"christian_life": [], "church_ministry": [], "theology": []}
+
+            # Validate categories against predefined lists
+            validated_categories = {
+                'christian_life': [cat for cat in categories.get('christian_life', []) 
+                                 if cat in CHRISTIAN_LIFE_CATEGORIES],
+                'church_ministry': [cat for cat in categories.get('church_ministry', []) 
+                                  if cat in CHURCH_MINISTRY_CATEGORIES],
+                'theology': [cat for cat in categories.get('theology', []) 
+                           if cat in THEOLOGY_CATEGORIES]
+            }
+            
+            debug_info['parsed_categories'] = validated_categories
             
             return {
                 'categories': validated_categories,
@@ -128,26 +176,22 @@ Here's the transcript to analyze:
             }
             
         except Exception as e:
-            error_msg = str(e)
-            print(f"Error categorizing transcript: {error_msg}")
-            
-            # Store error information
-            debug_info = {
-                'input_transcript': text[:1000] + '...' if len(text) > 1000 else text,
-                'ai_response': None,
-                'parsed_categories': None,
-                'errors': [error_msg]
-            }
+            print(f"Error categorizing transcript: {str(e)}")
             return {
                 'categories': {
                     'christian_life': [],
                     'church_ministry': [],
                     'theology': []
                 },
-                'debug': debug_info
+                'debug': {
+                    'input_transcript': text[:1000] + '...' if text else '',
+                    'ai_response': None,
+                    'parsed_categories': None,
+                    'errors': [str(e)]
+                }
             }
 
-    def extract_personal_stories(self, text: str) -> dict:
+    def extract_personal_stories(self, text: str) -> Dict[str, Any]:
         """Extract personal stories from the transcript."""
         try:
             if not text or len(text.strip()) < 100:
@@ -194,17 +238,14 @@ Here's the sermon transcript to analyze:
                 model="claude-3-haiku-20240307",
                 max_tokens=1024,
                 temperature=0.7,
-                system="You are an expert at analyzing sermon transcripts and identifying personal stories and anecdotes. Extract meaningful stories that illustrate key points. Always respond with valid JSON containing a 'stories' array, even if no stories are found. Ensure your response can be parsed as JSON.",
+                system="You are an expert at analyzing sermon transcripts and identifying personal stories and anecdotes. Extract meaningful stories that illustrate key points. Always respond with valid JSON containing a 'stories' array, even if no stories are found.",
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
             )
 
-            # Parse the response
-            import json
-            import re
-
-            response_text = message.content[0].text
+            # Get the response text
+            response_text = message.content[0].text.strip()
             
             try:
                 # First try direct JSON parsing
@@ -216,11 +257,10 @@ Here's the sermon transcript to analyze:
                     try:
                         parsed_data = json.loads(json_match.group(0))
                     except json.JSONDecodeError:
-                        # If still failing, create a basic structure
                         parsed_data = {"stories": []}
                 else:
                     parsed_data = {"stories": []}
-                
+
             # Ensure we have a valid stories array
             if not isinstance(parsed_data, dict) or "stories" not in parsed_data:
                 parsed_data = {"stories": []}
@@ -250,4 +290,3 @@ Here's the sermon transcript to analyze:
                 },
                 "rate_limited": "rate limit" in str(e).lower()
             }
-

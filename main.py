@@ -1,8 +1,14 @@
 import streamlit as st
+# Configure Streamlit page settings first
+st.set_page_config(
+    page_title="Sermon Search",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import os
 from dotenv import load_dotenv
 from utils.database import Database
-
 from utils.youtube_helper import YouTubeHelper
 from utils.transcript_processor import TranscriptProcessor
 from utils.command_parser import CommandParser
@@ -97,12 +103,7 @@ load_dotenv()
 os.environ["NEXT_PUBLIC_SUPABASE_URL"] = "https://cnfqqutobbpgrfqxqnxt.supabase.co"
 os.environ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuZnFxdXRvYmJwZ3JmcXhxbnh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMzMjEzNzYsImV4cCI6MjA0ODg5NzM3Nn0.IXKF8ZRhgR5eVdmcxWfw7r33T3DzHZMgr6c-Wsqj4Nc"
 
-# Configure Streamlit page at the very beginning
-st.set_page_config(
-    page_title="Sermon Search",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Page is already configured at the top of the file
 
 # Initialize database connection
 db = Database()
@@ -442,33 +443,57 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                     if categories:
                         if st.button("Regenerate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
-                                ai_response = ai_helper.categorize_transcript(result['transcript'])
-                                new_categories = ai_response['categories']
-                                st.session_state.categories_debug = ai_response['debug']
-                                if db.update_categories(st.session_state.show_transcript_id, new_categories):
-                                    # Fetch the updated categories
-                                    categories = db.get_categories(st.session_state.show_transcript_id)
-                                    st.success("Categories regenerated successfully!")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to update categories")
+                                try:
+                                    ai_response = ai_helper.categorize_transcript(result['transcript'])
+                                    new_categories = ai_response['categories']
+                                    
+                                    # Store debug info in session state
+                                    st.session_state.categories_debug = {
+                                        'input_transcript': ai_response['debug']['input_transcript'],
+                                        'ai_response': ai_response['debug']['ai_response'],
+                                        'parsed_categories': ai_response['debug']['parsed_categories'],
+                                        'errors': ai_response['debug'].get('errors', [])
+                                    }
+                                    
+                                    # Update categories in database
+                                    if db.update_categories(st.session_state.show_transcript_id, new_categories):
+                                        # Fetch the updated categories
+                                        categories = db.get_categories(st.session_state.show_transcript_id)
+                                        st.success("Categories regenerated successfully!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update categories in database")
+                                except Exception as e:
+                                    st.error(f"Error processing categories: {str(e)}")
+                                    st.session_state.categories_debug = {
+                                        'errors': [str(e)]
+                                    }
                     else:
                         if st.button("Generate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
-                                new_categories = ai_helper.categorize_transcript(result['transcript'])
-                                # Log the categories being generated
-                                st.write("Generated categories:", new_categories)
-                                update_success = db.update_categories(st.session_state.show_transcript_id, new_categories)
-                                st.write("Update success:", update_success)
-                                
-                                if update_success:
-                                    # Fetch and display the updated categories
-                                    updated_categories = db.get_categories(st.session_state.show_transcript_id)
-                                    st.write("Updated categories from database:", updated_categories)
-                                    st.success("Categories generated successfully!")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to update categories")
+                                try:
+                                    ai_response = ai_helper.categorize_transcript(result['transcript'])
+                                    new_categories = ai_response['categories']
+                                    
+                                    # Store debug info in session state
+                                    st.session_state.categories_debug = {
+                                        'input_transcript': ai_response['debug']['input_transcript'],
+                                        'ai_response': ai_response['debug']['ai_response'],
+                                        'parsed_categories': ai_response['debug']['parsed_categories'],
+                                        'errors': ai_response['debug'].get('errors', [])
+                                    }
+                                    
+                                    # Update categories in database
+                                    if db.update_categories(st.session_state.show_transcript_id, new_categories):
+                                        st.success("Categories generated successfully!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to save categories to database")
+                                except Exception as e:
+                                    st.error(f"Error generating categories: {str(e)}")
+                                    st.session_state.categories_debug = {
+                                        'errors': [str(e)]
+                                    }
             
             with stories_tab:
                 st.markdown("### Personal Stories")
