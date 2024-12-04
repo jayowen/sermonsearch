@@ -183,6 +183,10 @@ with st.sidebar:
         st.session_state.current_command = "search"
     if st.button("📋 List All Transcripts", use_container_width=True):
         st.session_state.current_command = "list"
+    if st.button("📊 Analyze Transcript", use_container_width=True):
+        st.session_state.current_command = "analyze"
+    if st.button("🔄 Compare Transcripts", use_container_width=True):
+        st.session_state.current_command = "compare"
     if st.button("💾 Export Data", use_container_width=True):
         st.session_state.current_command = "export"
     
@@ -346,6 +350,109 @@ elif st.session_state.current_command == "export":
                 st.info("No transcripts available to export")
         except Exception as e:
             st.error(f"Error exporting data: {str(e)}")
+
+elif st.session_state.current_command == "analyze":
+    st.subheader("Analyze Transcript")
+    transcripts = db.get_all_transcripts()
+    
+    if not transcripts:
+        st.info("No transcripts available for analysis")
+    else:
+        selected = st.selectbox(
+            "Select a transcript to analyze",
+            options=[(t['id'], t['title']) for t in transcripts],
+            format_func=lambda x: x[1]
+        )
+        
+        if selected:
+            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
+            if transcript:
+                # Show text statistics
+                stats = parser.get_word_stats(transcript['transcript'])
+                st.write("### Text Statistics")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Word Count", stats['word_count'])
+                    st.metric("Sentence Count", stats['sentence_count'])
+                with col2:
+                    st.metric("Unique Words", stats['unique_words'])
+                    st.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
+                
+                # Show keywords
+                st.write("### Top Keywords")
+                keywords = parser.extract_keywords(transcript['transcript'])
+                st.bar_chart(
+                    {word: count for word, count in keywords}
+                )
+                
+                # Show summary
+                st.write("### Summary")
+                summary_length = st.slider("Number of sentences in summary", 1, 10, 3)
+                summary = parser.summarize_text(transcript['transcript'], summary_length)
+                st.write(summary)
+
+elif st.session_state.current_command == "compare":
+    st.subheader("Compare Transcripts")
+    transcripts = db.get_all_transcripts()
+    
+    if len(transcripts) < 2:
+        st.info("Need at least 2 transcripts for comparison")
+    else:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            selected1 = st.selectbox(
+                "Select first transcript",
+                options=[(t['id'], t['title']) for t in transcripts],
+                format_func=lambda x: x[1],
+                key="compare1"
+            )
+        
+        with col2:
+            selected2 = st.selectbox(
+                "Select second transcript",
+                options=[(t['id'], t['title']) for t in transcripts],
+                format_func=lambda x: x[1],
+                key="compare2"
+            )
+        
+        if selected1 and selected2 and selected1 != selected2:
+            transcript1 = next((t for t in transcripts if t['id'] == selected1[0]), None)
+            transcript2 = next((t for t in transcripts if t['id'] == selected2[0]), None)
+            
+            if transcript1 and transcript2:
+                # Compare statistics
+                stats1 = command_parser.get_word_stats(transcript1['transcript'])
+                stats2 = command_parser.get_word_stats(transcript2['transcript'])
+                
+                st.write("### Statistical Comparison")
+                metrics = {
+                    "Word Count": (stats1['word_count'], stats2['word_count']),
+                    "Sentence Count": (stats1['sentence_count'], stats2['sentence_count']),
+                    "Unique Words": (stats1['unique_words'], stats2['unique_words']),
+                    "Avg Words/Sentence": (
+                        round(stats1['avg_words_per_sentence'], 1),
+                        round(stats2['avg_words_per_sentence'], 1)
+                    )
+                }
+                
+                for metric, (val1, val2) in metrics.items():
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric(f"{metric} (1)", val1)
+                    with col2:
+                        st.metric(f"{metric} (2)", val2)
+                
+                # Compare keywords
+                st.write("### Keyword Comparison")
+                kw1 = dict(command_parser.extract_keywords(transcript1['transcript']))
+                kw2 = dict(command_parser.extract_keywords(transcript2['transcript']))
+                common_words = set(kw1.keys()) & set(kw2.keys())
+                
+                if common_words:
+                    st.write("Common keywords:")
+                    for word in common_words:
+                        st.write(f"- {word} ({kw1[word]} vs {kw2[word]} occurrences)")
             
     if st.button("← Back to List"):
         st.session_state.current_command = "list"

@@ -25,7 +25,12 @@ class Database:
                     password=os.environ.get('PGPASSWORD'),
                     host=os.environ.get('PGHOST'),
                     port=os.environ.get('PGPORT'),
-                    connect_timeout=10
+                    connect_timeout=10,
+                    options="-c search_path=public -c statement_timeout=30000",
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5
                 )
                 return
             except Exception as e:

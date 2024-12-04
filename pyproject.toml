@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "google-api-python-client>=2.154.0",
     "isodate>=0.7.2",
+    "nltk>=3.9.1",
     "psycopg2-binary>=2.9.10",
     "streamlit>=1.40.2",
     "youtube-transcript-api>=0.6.3",
