@@ -71,7 +71,16 @@ class Database:
         }
         
         try:
-            result = self.supabase.table('categories').select('*').eq('video_id', video_id).execute()
+            # First get the transcript_id
+            transcript = self.get_transcript(video_id)
+            if not transcript:
+                print(f"No transcript found for video_id: {video_id}")
+                return categories
+                
+            transcript_id = transcript['id']
+            
+            # Then get categories using transcript_id
+            result = self.supabase.table('categories').select('*').eq('transcript_id', transcript_id).execute()
             
             if result.data:
                 data = result.data[0]
@@ -82,6 +91,8 @@ class Database:
             return categories
         except Exception as e:
             print(f"Error getting categories: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
             return categories
 
     def update_categories(self, video_id: str, categories: Dict[str, list]) -> bool:
