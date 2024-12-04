@@ -18,25 +18,28 @@ def process_single_video(video_id: str, title: str = None, no_redirect: bool = F
             st.error("No transcript available for this video.")
             st.stop()
         
-        # Generate AI summary
-        with st.spinner("Generating AI summary..."):
-            summary = ai_helper.generate_summary(transcript)
-        
-        # Generate categories
-        with st.spinner("Analyzing transcript and generating categories..."):
-            categories = ai_helper.categorize_transcript(transcript)
-        
         # If no title provided, get it from YouTube
         if not title:
             video_info = youtube.get_video_info(video_id)
             title = video_info['title']
-        
-        # Generate AI summary and categories
+
+        # Generate AI summary with progress indicator
         with st.spinner("Generating AI summary..."):
-            summary = ai_helper.generate_summary(transcript)
+            try:
+                summary = ai_helper.generate_summary(transcript)
+                st.write("✓ AI summary generated successfully")
+            except Exception as e:
+                st.error(f"Error generating AI summary: {str(e)}")
+                summary = None
         
+        # Generate categories with progress indicator
         with st.spinner("Analyzing transcript and generating categories..."):
-            categories = ai_helper.categorize_transcript(transcript)
+            try:
+                categories = ai_helper.categorize_transcript(transcript)
+                st.write("✓ Categories generated successfully")
+            except Exception as e:
+                st.error(f"Error generating categories: {str(e)}")
+                categories = None
             
         # Insert transcript with summary and get the ID
         transcript_id = db.insert_transcript(video_id, title, transcript)
@@ -410,9 +413,15 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                         if st.button("Generate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
                                 new_categories = ai_helper.categorize_transcript(result['transcript'])
-                                if db.update_categories(st.session_state.show_transcript_id, new_categories):
-                                    # Fetch the updated categories
-                                    categories = db.get_categories(st.session_state.show_transcript_id)
+                                # Log the categories being generated
+                                st.write("Generated categories:", new_categories)
+                                update_success = db.update_categories(st.session_state.show_transcript_id, new_categories)
+                                st.write("Update success:", update_success)
+                                
+                                if update_success:
+                                    # Fetch and display the updated categories
+                                    updated_categories = db.get_categories(st.session_state.show_transcript_id)
+                                    st.write("Updated categories from database:", updated_categories)
                                     st.success("Categories generated successfully!")
                                     st.rerun()
                                 else:
