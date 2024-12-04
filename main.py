@@ -36,25 +36,69 @@ def process_video(url: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
-def process_playlist(url: str) -> str:
-    """Process all videos in a playlist."""
+def process_playlist(url: str, batch_size: int = 5) -> None:
+    """Process all videos in a playlist with batch processing and progress updates."""
     try:
         videos = YouTubeHelper.get_playlist_videos(url)
+        total_videos = len(videos)
+        
+        if not videos:
+            st.error("No videos found in the playlist")
+            return
+            
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        stats = st.empty()
         processed = 0
         skipped = 0
+        errors = 0
         
-        for video in videos:
-            transcript = TranscriptProcessor.extract_transcript(video['video_id'])
-            if transcript:
-                formatted_transcript = TranscriptProcessor.format_transcript(transcript)
-                db.store_transcript(video['video_id'], video['title'], formatted_transcript)
-                processed += 1
-            else:
-                skipped += 1
+        # Process videos in batches
+        for i in range(0, total_videos, batch_size):
+            batch = videos[i:i + batch_size]
+            batch_processed = 0
+            batch_skipped = 0
+            
+            status_text.text(f"Processing batch {i//batch_size + 1} of {(total_videos + batch_size - 1)//batch_size}")
+            
+            for video in batch:
+                try:
+                    transcript = TranscriptProcessor.extract_transcript(video['video_id'])
+                    if transcript:
+                        formatted_transcript = TranscriptProcessor.format_transcript(transcript)
+                        db.store_transcript(video['video_id'], video['title'], formatted_transcript)
+                        batch_processed += 1
+                        processed += 1
+                    else:
+                        batch_skipped += 1
+                        skipped += 1
+                except Exception as e:
+                    st.warning(f"Error processing video '{video['title']}': {str(e)}")
+                    errors += 1
+                    time.sleep(1)  # Add delay on error to avoid rate limiting
                 
-        return f"Processing complete:\n- Successfully processed: {processed} videos\n- Skipped (no subtitles): {skipped} videos"
+                # Update progress
+                progress = (i + len(batch)) / total_videos
+                progress_bar.progress(min(1.0, progress))
+                
+                # Update stats
+                stats.markdown(f"""
+                    **Progress:**
+                    - Processed: {processed} videos
+                    - Skipped (no subtitles): {skipped} videos
+                    - Errors: {errors} videos
+                    - Remaining: {total_videos - (processed + skipped + errors)} videos
+                """)
+                
+            # Add a small delay between batches to avoid rate limiting
+            if i + batch_size < total_videos:
+                time.sleep(2)
+        
+        progress_bar.progress(1.0)
+        status_text.text("Processing complete!")
+        
     except Exception as e:
-        return f"Error: {str(e)}"
+        st.error(f"Error: {str(e)}")
 
 def search_transcripts(query: str) -> str:
     """Search through stored transcripts."""
@@ -167,16 +211,17 @@ if st.session_state.current_command == "process-video":
 elif st.session_state.current_command == "process-playlist":
     st.subheader("Process Playlist")
     url = st.text_input("Enter YouTube playlist URL:")
+    batch_size = st.slider("Batch Size", min_value=1, max_value=10, value=5, 
+                          help="Number of videos to process in each batch")
+    
     if st.button("Process", key="process_playlist_btn"):
         if url:
-            with st.spinner("Processing playlist..."):
-                result = process_playlist(url)
-                st.markdown(
-                    f"""<div class="terminal-container">
-                        <pre>{result}</pre>
-                    </div>""",
-                    unsafe_allow_html=True
-                )
+            st.markdown("""
+            ### Processing Playlist
+            The videos will be processed in batches to handle large playlists efficiently.
+            You can monitor the progress below:
+            """)
+            process_playlist(url, batch_size)
         else:
             st.warning("Please enter a playlist URL")
 
