@@ -209,21 +209,26 @@ elif st.session_state.current_command == "list":
     if not transcripts:
         st.info("No transcripts stored")
     else:
-        for t in transcripts:
-            col1, col2 = st.columns([4, 1])
-            with col1:
+        # Create a grid layout
+        cols = st.columns(3)
+        for idx, t in enumerate(transcripts):
+            with cols[idx % 3]:
                 st.markdown(
-                    f"""<div class="command-card">
-                        <div class="command-title">{t['title']}</div>
-                        <div class="command-description">Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}</div>
-                    </div>""",
+                    f"""<div class="video-card">
+                        <div class="video-thumbnail">
+                            <img src="https://img.youtube.com/vi/{t['video_id']}/mqdefault.jpg" alt="Video thumbnail">
+                        </div>
+                        <div class="video-info">
+                            <h3>{t['title']}</h3>
+                            <p>Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}</p>
+                        </div>
+                        </div>""",
                     unsafe_allow_html=True
                 )
-            with col2:
-                if st.button("View", key=f"btn_{t['video_id']}"):
+                if st.button("View Details", key=f"btn_{t['video_id']}", use_container_width=True):
                     st.session_state.show_transcript_id = t['video_id']
                     st.session_state.current_command = "view_video"
-                    st.rerun()
+                    st.experimental_rerun()
 
 # Handle video viewing
 if st.session_state.current_command == "view_video" and st.session_state.show_transcript_id:

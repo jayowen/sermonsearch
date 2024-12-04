@@ -6,7 +6,11 @@ from typing import List, Dict, Any
 class Database:
     def __init__(self):
         try:
-            self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
+            # Connect using individual parameters to avoid URL parsing issues
+            self.conn = psycopg2.connect(
+                os.environ['DATABASE_URL'],
+                options="-c search_path=public"
+            )
         except KeyError:
             self.conn = psycopg2.connect(
                 dbname=os.environ['PGDATABASE'],
