@@ -453,14 +453,9 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                 else:
                     st.write(f"Found {len(stories)} stories in the database")
                     for idx, story in enumerate(stories, 1):
-                        with st.expander(f"📖 {story['title']}", expanded=idx==1):
-                            st.markdown(f"**Summary:** {story['summary']}")
-                            st.markdown(f"**Key Message:** {story['message']}")
-                            if story.get('usage_count', 0) > 1:
-                                st.markdown("---")
-                                st.markdown(f"*This story appears in {story['usage_count']} sermons:*")
-                                for sermon in story['used_in_sermons']:
-                                    st.markdown(f"- {sermon}")
+                        with st.expander(f"📖 {story.get('title', 'Untitled Story')}", expanded=idx==1):
+                            st.markdown(f"**Summary:** {story.get('summary', 'No summary available')}")
+                            st.markdown(f"**Key Message:** {story.get('message', 'No message available')}")
 
                 # Add debug expander
                 with st.expander("🔍 Debug Information"):

@@ -229,13 +229,22 @@ class Database:
                 
             transcript_id = transcript['id']
             
-            # Then get the transcript's stories through the junction table
-            result = self.supabase.table('transcript_stories').select(
-                'stories!inner(*)'
-            ).eq('transcript_id', transcript_id).execute()
+            # Get stories through a join query
+            result = self.supabase.from_('transcript_stories')\
+                .select('stories(id, title, summary, message)')\
+                .eq('transcript_id', transcript_id)\
+                .execute()
             
             print(f"Stories retrieval result: {result.data if hasattr(result, 'data') else 'No data'}")
-            return result.data if result.data else []
+            
+            # Extract stories from the nested structure
+            stories = []
+            if result.data:
+                for item in result.data:
+                    if item.get('stories'):
+                        stories.append(item['stories'])
+            
+            return stories
         except Exception as e:
             print(f"Error getting personal stories: {str(e)}")
             if hasattr(e, 'response'):
