@@ -31,12 +31,17 @@ def process_single_video(video_id: str, title: str = None, no_redirect: bool = F
             video_info = youtube.get_video_info(video_id)
             title = video_info['title']
         
-        # Insert transcript and get the ID
+        # Generate AI summary
+        with st.spinner("Generating AI summary..."):
+            summary = ai_helper.generate_summary(transcript)
+            
+        # Insert transcript with summary and get the ID
         transcript_id = db.insert_transcript(video_id, title, transcript)
         if transcript_id:
-            # Update categories
+            # Update categories and summary
             db.update_categories(transcript_id, categories)
-            st.success("Transcript processed and categorized successfully!")
+            db.update_transcript_summary(video_id, summary)
+            st.success("Transcript processed, categorized, and summarized successfully!")
             
             # Only update state and redirect if not processing a playlist
             if not no_redirect:
