@@ -148,3 +148,8 @@
 .stMultiSelect [data-baseweb="tag"] button {
     color: rgba(255, 255, 255, 0.8) !important;  /* Slightly transparent white */
 }
+/* Custom button styles to prevent text wrapping */
+.stButton button {
+    white-space: nowrap !important;
+    min-width: fit-content !important;
+}
