@@ -7,11 +7,15 @@ import csv
 
 class Database:
     def __init__(self):
-        supabase_url = os.environ.get("SUPABASE_URL")
-        supabase_key = os.environ.get("SUPABASE_KEY")
+        supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+        supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
         if not supabase_url or not supabase_key:
             raise ValueError("Missing Supabase credentials")
-        self.supabase: Client = create_client(supabase_url, supabase_key)
+        try:
+            self.supabase: Client = create_client(supabase_url, supabase_key)
+        except Exception as e:
+            print(f"Error initializing Supabase client: {str(e)}")
+            raise
 
     def insert_transcript(self, video_id: str, title: str, transcript: str) -> Optional[str]:
         """Insert a new transcript into the database."""
@@ -86,9 +90,15 @@ class Database:
         """Get all transcripts."""
         try:
             result = self.supabase.table('transcripts').select('*').order('created_at.desc').execute()
-            return result.data if result.data else []
+            if not result.data:
+                print("No transcripts found in database")
+                return []
+            print(f"Successfully retrieved {len(result.data)} transcripts")
+            return result.data
         except Exception as e:
             print(f"Error getting all transcripts: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
             return []
 
     def search_transcripts(self, query: str) -> List[Dict[str, Any]]:
