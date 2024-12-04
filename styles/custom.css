@@ -1,33 +1,7 @@
-.header-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background-color: #1E1E1E;
-    color: #00ff00;
-    padding: 1rem;
-    z-index: 1000;
-    border-bottom: 2px solid #00ff00;
-    text-align: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.header-bar h1 {
-    margin: 0;
-    font-size: 1.8rem;
-    font-weight: bold;
-    font-family: 'Inter', sans-serif;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
-
 .main-content {
-    margin-top: 3.5rem;
     padding: 1rem;
-    position: relative;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .terminal-container {

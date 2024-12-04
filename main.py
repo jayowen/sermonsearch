@@ -1,6 +1,14 @@
+import streamlit as st
+
+# Configure Streamlit page at the very beginning
+st.set_page_config(
+    page_title="YouTube Transcript Processor",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import os
 from googleapiclient.discovery import build
-import streamlit as st
 import time
 from psycopg2.extras import RealDictCursor
 from utils.command_parser import CommandParser
@@ -8,7 +16,7 @@ from utils.database import Database
 from utils.transcript_processor import TranscriptProcessor
 from utils.youtube_helper import YouTubeHelper
 
-# Initialize components
+# Initialize database connection
 def init_database():
     max_retries = 3
     retry_count = 0
@@ -49,109 +57,6 @@ def process_video(url: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
-def process_playlist(url: str, batch_size: int = 5) -> None:
-    """Process all videos in a playlist with batch processing and progress updates."""
-    try:
-        videos = YouTubeHelper.get_playlist_videos(url)
-        total_videos = len(videos)
-        
-        if not videos:
-            st.error("No videos found in the playlist")
-            return
-            
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        stats = st.empty()
-        processed = 0
-        skipped = 0
-        errors = 0
-        
-        # Process videos in batches
-        for i in range(0, total_videos, batch_size):
-            batch = videos[i:i + batch_size]
-            batch_processed = 0
-            batch_skipped = 0
-            
-            status_text.text(f"Processing batch {i//batch_size + 1} of {(total_videos + batch_size - 1)//batch_size}")
-            
-            for video in batch:
-                try:
-                    transcript = TranscriptProcessor.extract_transcript(video['video_id'])
-                    if transcript:
-                        formatted_transcript = TranscriptProcessor.format_transcript(transcript)
-                        db.store_transcript(video['video_id'], video['title'], formatted_transcript)
-                        batch_processed += 1
-                        processed += 1
-                    else:
-                        batch_skipped += 1
-                        skipped += 1
-                except Exception as e:
-                    st.warning(f"Error processing video '{video['title']}': {str(e)}")
-                    errors += 1
-                    time.sleep(1)  # Add delay on error to avoid rate limiting
-                
-                # Update progress
-                progress = (i + len(batch)) / total_videos
-                progress_bar.progress(min(1.0, progress))
-                
-                # Update stats
-                stats.markdown(f"""
-                    **Progress:**
-                    - Processed: {processed} videos
-                    - Skipped (no subtitles): {skipped} videos
-                    - Errors: {errors} videos
-                    - Remaining: {total_videos - (processed + skipped + errors)} videos
-                """)
-                
-            # Add a small delay between batches to avoid rate limiting
-            if i + batch_size < total_videos:
-                time.sleep(2)
-        
-        progress_bar.progress(1.0)
-        status_text.text("Processing complete!")
-        
-    except Exception as e:
-        st.error(f"Error: {str(e)}")
-
-def search_transcripts(query: str) -> str:
-    """Search through stored transcripts."""
-    results = db.search_transcripts(query)
-    if not results:
-        return "No matches found"
-    
-    output = []
-    for result in results:
-        video_url = f"https://youtube.com/watch?v={result['video_id']}"
-        output.append(f"Video: <a href='{video_url}' target='_blank'>{result['title']}</a>")
-        output.append(f"Highlight: {result['highlight']}\n")
-    return "\n".join(output)
-
-def get_transcript(video_id: str) -> str:
-    """Get transcript content for a specific video."""
-    with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("SELECT title, transcript FROM transcripts WHERE video_id = %s", (video_id,))
-        result = cur.fetchone()
-        if result:
-            return f"## {result['title']}\n\n{result['transcript']}"
-        return "Transcript not found"
-
-def list_transcripts() -> None:
-    """List all stored transcripts."""
-    transcripts = db.get_all_transcripts()
-    if not transcripts:
-        st.write("No transcripts stored")
-        return
-    
-    for t in transcripts:
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.write(f"• {t['title']}")
-            st.text(f"  Video ID: {t['video_id']}")
-            st.text(f"  Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}")
-        with col2:
-            if st.button("View Transcript", key=f"btn_{t['video_id']}"):
-                st.session_state.show_transcript_id = t['video_id']
-
 # Register commands
 parser.register("process-video", lambda args: process_video(args[0]),
                "process-video <video_url> - Process a single YouTube video")
@@ -166,22 +71,21 @@ parser.register("transcript", lambda args: get_transcript(args[0]),
 parser.register("help", lambda args: parser.get_help(),
                "help - Show available commands")
 
-# Streamlit UI
-st.set_page_config(
-    page_title="YouTube Transcript Processor",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Load custom CSS
-with open("styles/custom.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
 # Initialize session states
 if 'show_transcript_id' not in st.session_state:
     st.session_state.show_transcript_id = None
 if 'current_command' not in st.session_state:
     st.session_state.current_command = None
+
+# Set up the page header
+st.markdown("<h1 style='text-align: center; color: #00ff00; padding: 1rem; margin: -1rem -1rem 1rem -1rem; background-color: #1E1E1E; border-bottom: 2px solid #00ff00;'>YouTube Transcript Processor</h1>", unsafe_allow_html=True)
+
+# Load custom CSS for the rest of the components
+try:
+    with open("styles/custom.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+except Exception as e:
+    st.error(f"Error loading styles: {str(e)}")
 
 # Sidebar
 with st.sidebar:
@@ -213,20 +117,6 @@ with st.sidebar:
     with st.expander("ℹ️ Command Help"):
         st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
 
-# Configure page and add custom styles
-st.set_page_config(
-    page_title="YouTube Transcript Processor",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Add custom styles and header
-st.markdown("""
-    <div class="header-bar">
-        <h1>YouTube Transcript Processor</h1>
-    </div>
-    <div class="main-content">
-""", unsafe_allow_html=True)
 
 # Command interface
 if st.session_state.current_command == "process-video":
