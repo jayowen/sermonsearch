@@ -442,7 +442,9 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                     if categories:
                         if st.button("Regenerate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
-                                new_categories = ai_helper.categorize_transcript(result['transcript'])
+                                ai_response = ai_helper.categorize_transcript(result['transcript'])
+                                new_categories = ai_response['categories']
+                                st.session_state.categories_debug = ai_response['debug']
                                 if db.update_categories(st.session_state.show_transcript_id, new_categories):
                                     # Fetch the updated categories
                                     categories = db.get_categories(st.session_state.show_transcript_id)

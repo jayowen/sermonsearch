@@ -114,16 +114,18 @@ Here's the transcript to analyze:
                 'theology': [cat for cat in categories.get('theology', []) if cat in THEOLOGY_CATEGORIES]
             }
             
-            # Store debug information
+            # Create debug information
             debug_info = {
                 'input_transcript': text[:1000] + '...' if len(text) > 1000 else text,  # First 1000 chars for brevity
                 'ai_response': response_text,
                 'parsed_categories': validated_categories,
                 'errors': []
             }
-            st.session_state.categories_debug = debug_info
             
-            return validated_categories
+            return {
+                'categories': validated_categories,
+                'debug': debug_info
+            }
             
         except Exception as e:
             error_msg = str(e)
@@ -136,12 +138,13 @@ Here's the transcript to analyze:
                 'parsed_categories': None,
                 'errors': [error_msg]
             }
-            st.session_state.categories_debug = debug_info
-            
             return {
-                'christian_life': [],
-                'church_ministry': [],
-                'theology': []
+                'categories': {
+                    'christian_life': [],
+                    'church_ministry': [],
+                    'theology': []
+                },
+                'debug': debug_info
             }
 
     def extract_personal_stories(self, text: str) -> dict:
