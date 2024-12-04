@@ -80,33 +80,40 @@ if st.session_state.current_command == "process":
                 existing_video = db.video_exists(video_id)
                 if existing_video:
                     st.info(f"This video '{existing_video['title']}' is already in the system.")
+                    
+                    # Create unique keys for buttons
+                    view_key = f"view_{video_id}"
+                    reprocess_key = f"reprocess_{video_id}"
+                    
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("View Existing", key="view_existing_btn"):
-                            st.session_state["show_transcript_id"] = video_id
-                            st.session_state["current_command"] = "view_video"
-                            st.rerun()
+                        if st.button("View Existing", key=view_key):
+                            st.session_state.show_transcript_id = video_id
+                            st.session_state.current_command = "view_video"
+                            st.experimental_rerun()
+                            
                     with col2:
-                        if st.button("Re-process"):
+                        if st.button("Re-process", key=reprocess_key):
                             try:
-                                # Process existing video
-                                transcript = processor.extract_transcript(video_id)
-                                if not transcript:
-                                    st.error("No transcript available for this video.")
-                                    st.stop()
-                                
-                                # Generate AI summary
-                                with st.spinner("Generating AI summary..."):
-                                    ai_summary = parser.summarize_text(transcript, max_length=250)
-                                
-                                # Store in database with summary
-                                db.store_transcript(video_id, existing_video['title'], transcript, ai_summary)
-                                st.success("Transcript re-processed successfully!")
-                                
-                                # Redirect to video view
-                                st.session_state.show_transcript_id = video_id
-                                st.session_state.current_command = "view_video"
-                                st.rerun()
+                                with st.spinner("Processing video..."):
+                                    # Process existing video
+                                    transcript = processor.extract_transcript(video_id)
+                                    if not transcript:
+                                        st.error("No transcript available for this video.")
+                                        st.stop()
+                                    
+                                    # Generate AI summary
+                                    with st.spinner("Generating AI summary..."):
+                                        ai_summary = parser.summarize_text(transcript, max_length=250)
+                                    
+                                    # Store in database with summary
+                                    db.store_transcript(video_id, existing_video['title'], transcript, ai_summary)
+                                    st.success("Transcript re-processed successfully!")
+                                    
+                                    # Update state and redirect
+                                    st.session_state.show_transcript_id = video_id
+                                    st.session_state.current_command = "view_video"
+                                    st.experimental_rerun()
                             except Exception as e:
                                 st.error(f"Error re-processing video: {str(e)}")
                                 st.stop()
