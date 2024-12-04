@@ -13,39 +13,47 @@ class Database:
         
     def _connect(self):
         """Establish database connection with retries"""
-        max_retries = 3
+        max_retries = 5
         retry_count = 0
+        last_error = None
         
         while retry_count < max_retries:
             try:
-                # First try with connection parameters
-                self.conn = psycopg2.connect(
-                    dbname=os.environ.get('PGDATABASE'),
-                    user=os.environ.get('PGUSER'),
-                    password=os.environ.get('PGPASSWORD'),
-                    host=os.environ.get('PGHOST'),
-                    port=os.environ.get('PGPORT'),
-                    connect_timeout=10,
-                    options="-c search_path=public -c statement_timeout=30000",
-                    keepalives=1,
-                    keepalives_idle=30,
-                    keepalives_interval=10,
-                    keepalives_count=5
-                )
-                return
-            except Exception as e:
-                try:
-                    # Fallback to URL if parameters fail
+                if os.environ.get('DATABASE_URL'):
+                    # Try URL-based connection first
                     self.conn = psycopg2.connect(
                         os.environ.get('DATABASE_URL'),
-                        connect_timeout=10
+                        connect_timeout=30,
+                        keepalives=1,
+                        keepalives_idle=30,
+                        keepalives_interval=10,
+                        keepalives_count=5
                     )
-                    return
-                except Exception as e:
-                    retry_count += 1
-                    if retry_count == max_retries:
-                        raise Exception(f"Failed to connect to database after {max_retries} attempts") from e
-                    time.sleep(1)  # Wait before retrying
+                else:
+                    # Fallback to parameter-based connection
+                    self.conn = psycopg2.connect(
+                        dbname=os.environ.get('PGDATABASE'),
+                        user=os.environ.get('PGUSER'),
+                        password=os.environ.get('PGPASSWORD'),
+                        host=os.environ.get('PGHOST'),
+                        port=os.environ.get('PGPORT'),
+                        connect_timeout=30,
+                        options="-c search_path=public",
+                        keepalives=1,
+                        keepalives_idle=30,
+                        keepalives_interval=10,
+                        keepalives_count=5
+                    )
+                # Test the connection
+                with self.conn.cursor() as cur:
+                    cur.execute('SELECT 1')
+                return
+            except Exception as e:
+                last_error = str(e)
+                retry_count += 1
+                if retry_count == max_retries:
+                    raise Exception(f"Database connection failed after {max_retries} attempts. Last error: {last_error}")
+                time.sleep(2 * retry_count)  # Exponential backoff
 
     def setup_database(self):
         """Create necessary tables if they don't exist."""
