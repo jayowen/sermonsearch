@@ -1,10 +1,14 @@
-import streamlit as st
-
 # Configure Streamlit page at the very beginning
+import streamlit as st
 st.set_page_config(
     page_title="YouTube Transcript Processor",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
 
 import os
@@ -16,21 +20,45 @@ from utils.database import Database
 from utils.transcript_processor import TranscriptProcessor
 from utils.youtube_helper import YouTubeHelper
 
+# Apply custom styling
+st.markdown("""
+    <style>
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+        font-family: monospace;
+    }
+    .main .block-container {
+        padding-top: 2rem;
+    }
+    header {
+        background-color: #0E1117;
+        padding: 1rem 0;
+    }
+    h1 {
+        color: #00ff00 !important;
+        text-align: center;
+        padding: 1rem;
+        border-bottom: 2px solid #00ff00;
+        margin-bottom: 2rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Initialize database connection
 def init_database():
-    max_retries = 3
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            return Database()
-        except Exception as e:
-            retry_count += 1
-            if retry_count == max_retries:
-                st.error(f"Failed to connect to the database after {max_retries} attempts. Please try again later.")
-                st.stop()
-            time.sleep(2)  # Wait before retrying
+    """Initialize database connection with better error handling."""
+    try:
+        return Database()
+    except Exception as e:
+        st.error("Database connection error. The application will continue without database features.")
+        return None
 
-db = init_database()
+# Initialize database in session state to persist across reruns
+if 'db' not in st.session_state:
+    st.session_state.db = init_database()
+
+db = st.session_state.db
 parser = CommandParser()
 
 def process_video(url: str) -> str:
@@ -77,10 +105,9 @@ if 'show_transcript_id' not in st.session_state:
 if 'current_command' not in st.session_state:
     st.session_state.current_command = None
 
-# Set up the page header
-st.markdown("<h1 style='text-align: center; color: #00ff00; padding: 1rem; margin: -1rem -1rem 1rem -1rem; background-color: #1E1E1E; border-bottom: 2px solid #00ff00;'>YouTube Transcript Processor</h1>", unsafe_allow_html=True)
+st.title("YouTube Transcript Processor")
 
-# Load custom CSS for the rest of the components
+# Load custom CSS
 try:
     with open("styles/custom.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)

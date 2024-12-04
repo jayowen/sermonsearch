@@ -12,51 +12,38 @@ class Database:
         self.setup_database()
         
     def _connect(self):
-        """Establish database connection with retries"""
-        max_retries = 5
-        retry_count = 0
-        last_error = None
-        
-        while retry_count < max_retries:
-            try:
-                # Basic connection parameters
-                conn_params = {
-                    'application_name': 'youtube_transcript_processor',
-                    'connect_timeout': 10,
-                    'options': '-c search_path=public'
-                }
-                
-                # Establish connection
-                if os.environ.get('DATABASE_URL'):
-                    self.conn = psycopg2.connect(
-                        os.environ['DATABASE_URL'],
-                        **conn_params
-                    )
-                else:
-                    self.conn = psycopg2.connect(
-                        dbname=os.environ.get('PGDATABASE'),
-                        user=os.environ.get('PGUSER'),
-                        password=os.environ.get('PGPASSWORD'),
-                        host=os.environ.get('PGHOST'),
-                        port=os.environ.get('PGPORT'),
-                        **conn_params
-                    )
-                
-                # Set session parameters
-                with self.conn.cursor() as cur:
-                    cur.execute("SET SESSION client_min_messages TO error;")
-                    cur.execute("SET search_path TO public;")
-                    cur.execute('SELECT 1')
-                self.conn.commit()
-                print("Database connection established successfully")
-                return
-            except Exception as e:
-                last_error = str(e)
-                print(f"Connection attempt {retry_count + 1} failed: {str(e)}")
-                retry_count += 1
-                if retry_count == max_retries:
-                    raise Exception(f"Database connection failed after {max_retries} attempts. Last error: {last_error}")
-                time.sleep(2 * retry_count)  # Exponential backoff
+        """Establish database connection with simplified error handling"""
+        try:
+            # Basic connection parameters
+            conn_params = {
+                'application_name': 'youtube_transcript_processor',
+                'connect_timeout': 10,
+                'options': '-c search_path=public',
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5
+            }
+            
+            # Establish connection using DATABASE_URL
+            if os.environ.get('DATABASE_URL'):
+                self.conn = psycopg2.connect(
+                    os.environ['DATABASE_URL'],
+                    **conn_params
+                )
+            else:
+                raise Exception("DATABASE_URL environment variable not found")
+            
+            # Set session parameters
+            with self.conn.cursor() as cur:
+                cur.execute("SET SESSION client_min_messages TO error;")
+                cur.execute("SET search_path TO public;")
+                cur.execute('SELECT 1')
+            self.conn.commit()
+            print("Database connection established successfully")
+        except Exception as e:
+            print(f"Database connection error: {str(e)}")
+            raise
 
     def setup_database(self):
         """Create necessary tables if they don't exist."""

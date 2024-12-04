@@ -48,95 +48,6 @@
     font-style: italic;
 }
 
-.stApp {
-    font-family: 'Inter', sans-serif;
-}
-
-.terminal-container {
-    background: #1E1E1E;
-    border-radius: 10px;
-    padding: 20px;
-    margin: 10px 0;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.command-card {
-    background: #2D2D2D;
-    border-radius: 8px;
-    padding: 15px;
-    margin: 10px 0;
-    transition: transform 0.2s;
-    cursor: pointer;
-}
-
-.command-card:hover {
-    transform: translateY(-2px);
-}
-
-.command-title {
-    color: #00ff00;
-    font-size: 1.1em;
-    margin-bottom: 5px;
-}
-
-.command-description {
-    color: #CCCCCC;
-    font-size: 0.9em;
-}
-
-.transcript-viewer {
-    background: #2D2D2D;
-    border-radius: 10px;
-    padding: 20px;
-    margin: 15px 0;
-    border: 1px solid #404040;
-}
-
-.transcript-title {
-    color: #00ff00;
-    font-size: 1.4em;
-    margin-bottom: 15px;
-}
-
-.search-result {
-    background: #2D2D2D;
-    border-radius: 8px;
-    padding: 15px;
-    margin: 10px 0;
-    border-left: 3px solid #00ff00;
-}
-
-.video-link {
-    color: #00ff00;
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.video-link:hover {
-    text-decoration: underline;
-}
-
-.highlight-text {
-    background: rgba(0, 255, 0, 0.1);
-    padding: 2px 5px;
-    border-radius: 3px;
-}
-
-.command-input {
-    color: #00ff00;
-    margin-bottom: 10px;
-    font-family: 'Courier New', monospace;
-}
-
-.status-success {
-    color: #00ff00;
-    font-weight: 500;
-}
-
-.status-error {
-    color: #ff4444;
-    font-weight: 500;
-}
 .video-card {
     background: #1E1E1E;
     border-radius: 12px;
@@ -188,44 +99,26 @@
     margin: 0;
 }
 
-.video-container {
-    background: #1E1E1E;
-    border-radius: 12px;
-    padding: 20px;
-    margin: 20px 0;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.video-title {
-    color: #00ff00;
-    font-size: 1.8em;
-    margin-bottom: 20px;
-    font-family: 'Inter', sans-serif;
-}
-
-.transcript-section {
-    margin-top: 30px;
-}
-
-.transcript-section h3 {
-    color: #00ff00;
-    font-size: 1.4em;
-    margin-bottom: 15px;
-    font-family: 'Inter', sans-serif;
-}
-
-.back-button {
-    margin-top: 20px;
-    padding: 10px 20px;
+.transcript-viewer {
     background: #2D2D2D;
-    border: 1px solid #00ff00;
-    color: #00ff00;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.2s;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 15px 0;
+    border: 1px solid #404040;
 }
 
-.back-button:hover {
-    background: #00ff00;
-    color: #1E1E1E;
+.video-link {
+    color: #00ff00;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.video-link:hover {
+    text-decoration: underline;
+}
+
+.highlight-text {
+    background: rgba(0, 255, 0, 0.1);
+    padding: 2px 5px;
+    border-radius: 3px;
 }
