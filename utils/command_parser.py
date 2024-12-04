@@ -18,7 +18,10 @@ class CommandParser:
         try:
             nltk.download('punkt', quiet=True)
             nltk.download('stopwords', quiet=True)
-        except Exception:
+            nltk.download('punkt_tab', quiet=True)
+            nltk.download('averaged_perceptron_tagger', quiet=True)
+        except Exception as e:
+            print(f"Error downloading NLTK data: {str(e)}")
             pass
 
     def register(self, command: str, handler: Callable, help_text: str):
