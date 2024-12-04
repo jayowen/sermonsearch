@@ -221,14 +221,25 @@ class Database:
     def get_personal_stories(self, video_id: str) -> List[Dict[str, Any]]:
         """Get personal stories for a transcript."""
         try:
-            # First get the transcript's stories through the junction table
+            # First get the transcript to get its ID
+            transcript = self.get_transcript(video_id)
+            if not transcript:
+                print(f"No transcript found for video_id: {video_id}")
+                return []
+                
+            transcript_id = transcript['id']
+            
+            # Then get the transcript's stories through the junction table
             result = self.supabase.table('transcript_stories').select(
                 'stories!inner(*)'
-            ).eq('transcript_id', video_id).execute()
+            ).eq('transcript_id', transcript_id).execute()
             
+            print(f"Stories retrieval result: {result.data if hasattr(result, 'data') else 'No data'}")
             return result.data if result.data else []
         except Exception as e:
             print(f"Error getting personal stories: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
             return []
 
     def update_personal_stories(self, video_id: str, stories: List[Dict[str, str]]) -> bool:
