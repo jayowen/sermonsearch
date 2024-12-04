@@ -278,7 +278,7 @@ elif st.session_state.current_command == "list":
                         </div>
                         <div class="video-info">
                             <h3>{t['title']}</h3>
-                            <p>Added: {t['created_at'].split('.')[0].replace('T', ' ')}</p>
+                            <p>Added: {t['created_at'].strftime('%Y-%m-%d %H:%M:%S')}</p>
                         </div>
                         </div>""",
                     unsafe_allow_html=True

@@ -32,17 +32,13 @@ class Database:
                     'keepalives_count': 5
                 }
                 
-                # Get database connection parameters from environment
-                db_params = {
-                    'dbname': os.environ.get('PGDATABASE'),
-                    'user': os.environ.get('PGUSER'),
-                    'password': os.environ.get('PGPASSWORD'),
-                    'host': os.environ.get('PGHOST'),
-                    'port': os.environ.get('PGPORT')
-                }
+                # Get database URL from environment
+                database_url = os.environ.get('DATABASE_URL')
+                if not database_url:
+                    raise ValueError("DATABASE_URL environment variable is not set")
                 
-                # Establish connection using individual parameters
-                self.conn = psycopg2.connect(**db_params, **conn_params)
+                # Establish connection using the database URL
+                self.conn = psycopg2.connect(database_url, **conn_params)
                 
                 # Set session parameters
                 with self.conn.cursor() as cur:
