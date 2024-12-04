@@ -31,15 +31,18 @@ def process_single_video(video_id: str, title: str = None, no_redirect: bool = F
             video_info = youtube.get_video_info(video_id)
             title = video_info['title']
         
-        # Generate AI summary
+        # Generate AI summary and categories
         with st.spinner("Generating AI summary..."):
             summary = ai_helper.generate_summary(transcript)
+        
+        with st.spinner("Analyzing transcript and generating categories..."):
+            categories = ai_helper.categorize_transcript(transcript)
             
         # Insert transcript with summary and get the ID
         transcript_id = db.insert_transcript(video_id, title, transcript)
         if transcript_id:
             # Update categories and summary
-            db.update_categories(transcript_id, categories)
+            db.update_categories(video_id, categories)
             db.update_transcript_summary(video_id, summary)
             st.success("Transcript processed, categorized, and summarized successfully!")
             
