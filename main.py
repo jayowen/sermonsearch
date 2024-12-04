@@ -1,19 +1,18 @@
-# Configure Streamlit page at the very beginning
 import streamlit as st
+import os
+from utils.database import Database
+from utils.youtube_helper import YouTubeHelper
+from utils.transcript_processor import TranscriptProcessor
+from utils.command_parser import CommandParser
+from typing import Dict, Any
+import json
+
+# Configure Streamlit page at the very beginning
 st.set_page_config(
     page_title="YouTube Transcript Processor",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-import os
-from googleapiclient.discovery import build
-import time
-from psycopg2.extras import RealDictCursor
-from utils.command_parser import CommandParser
-from utils.database import Database
-from utils.transcript_processor import TranscriptProcessor
-from utils.youtube_helper import YouTubeHelper
 
 # Header and basic styling
 st.markdown("""
@@ -45,132 +44,85 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
+
 # Initialize database connection
-def init_database():
-    """Initialize database connection with better error handling."""
-    try:
-        return Database()
-    except Exception as e:
-        st.warning("🔄 Attempting to connect to database...")
-        return None
-
-# Initialize database in session state to persist across reruns
-if 'db' not in st.session_state:
-    st.session_state.db = init_database()
-
-# Get database connection
-db = st.session_state.db
+db = Database()
+youtube = YouTubeHelper()
+processor = TranscriptProcessor()
 parser = CommandParser()
 
-# Show database status in sidebar
-with st.sidebar:
-    if db is None:
-        st.warning("⚠️ Database disconnected")
-    else:
-        st.success("✅ Database connected")
-
-def process_video(url: str) -> str:
-    """Process a single YouTube video."""
-    try:
-        video_id = TranscriptProcessor.extract_video_id(url)
-        transcript = TranscriptProcessor.extract_transcript(video_id)
-        
-        if not transcript:
-            return "Error: No subtitles available for this video"
-            
-        # Get video title using YouTube API
-        youtube = build('youtube', 'v3', developerKey=os.environ.get('YOUTUBE_API_KEY'))
-        response = youtube.videos().list(part='snippet', id=video_id).execute()
-        
-        if not response['items']:
-            return "Error: Video not found"
-            
-        title = response['items'][0]['snippet']['title']
-        formatted_transcript = TranscriptProcessor.format_transcript(transcript)
-        db.store_transcript(video_id, title, formatted_transcript)
-        
-        return f"Successfully processed video:\n- Title: {title}\n- Video ID: {video_id}"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-# Register commands
-parser.register("process-video", lambda args: process_video(args[0]),
-               "process-video <video_url> - Process a single YouTube video")
-parser.register("process-playlist", lambda args: process_playlist(args[0]),
-               "process-playlist <playlist_url> - Process all videos in a YouTube playlist")
-parser.register("search", lambda args: search_transcripts(" ".join(args)),
-               "search <query> - Search through stored transcripts")
-parser.register("list", lambda args: list_transcripts(),
-               "list - Show all stored transcripts")
-parser.register("transcript", lambda args: get_transcript(args[0]),
-               "transcript <video_id> - Show transcript for a specific video")
-parser.register("help", lambda args: parser.get_help(),
-               "help - Show available commands")
-
-# Initialize session states
-if 'show_transcript_id' not in st.session_state:
-    st.session_state.show_transcript_id = None
+# Initialize session state
 if 'current_command' not in st.session_state:
     st.session_state.current_command = None
+if 'show_transcript_id' not in st.session_state:
+    st.session_state.show_transcript_id = None
 
-# Load custom CSS
+
+# Load and apply custom CSS
 try:
-    with open("styles/custom.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    with open('styles/custom.css') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 except Exception as e:
     st.error(f"Error loading styles: {str(e)}")
 
-# Sidebar
+# Main content wrapper
+st.markdown('<div class="main-content">', unsafe_allow_html=True)
+
+# Sidebar navigation
 with st.sidebar:
-    st.title("Commands")
+    st.title("YouTube Transcript Processor")
+    st.markdown("---")
     
-    # Command buttons
-    if st.button("📺 Process Video", use_container_width=True):
-        st.session_state.current_command = "process-video"
+    if st.button("🎥 Process Single Video", use_container_width=True):
+        st.session_state.current_command = "process"
     if st.button("📑 Process Playlist", use_container_width=True):
-        st.session_state.current_command = "process-playlist"
+        st.session_state.current_command = "playlist"
     if st.button("🔍 Search Transcripts", use_container_width=True):
         st.session_state.current_command = "search"
     if st.button("📋 List All Transcripts", use_container_width=True):
         st.session_state.current_command = "list"
+    if st.button("📊 Total Data Analysis", use_container_width=True):
+        st.session_state.current_command = "total_analysis"
     if st.button("📊 Basic Analysis", use_container_width=True):
         st.session_state.current_command = "analyze"
     if st.button("📈 Word Frequency", use_container_width=True):
-        st.session_state.current_command = "word_frequency"
+        st.session_state.current_command = "frequency"
     if st.button("🔑 Key Phrases", use_container_width=True):
-        st.session_state.current_command = "key_phrases"
+        st.session_state.current_command = "phrases"
     if st.button("⏱️ Time Segments", use_container_width=True):
-        st.session_state.current_command = "time_segments"
-    if st.button("🔄 Compare Transcripts", use_container_width=True):
-        st.session_state.current_command = "compare"
+        st.session_state.current_command = "segments"
     if st.button("💾 Export Data", use_container_width=True):
         st.session_state.current_command = "export"
-    
     st.markdown("---")
     with st.expander("ℹ️ Command Help"):
         st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
 
 
-# Command interface
-if st.session_state.current_command == "process-video":
+# Main content area
+if st.session_state.current_command == "process":
     st.subheader("Process Single Video")
-    url = st.text_input("Enter YouTube video URL:")
-    if st.button("Process", key="process_video_btn"):
+    url = st.text_input("Enter YouTube Video URL")
+    
+    if st.button("Process Video"):
         if url:
-            with st.spinner("Processing video..."):
-                result = process_video(url)
-                st.markdown(
-                    f"""<div class="terminal-container">
-                        <pre>{result}</pre>
-                    </div>""",
-                    unsafe_allow_html=True
-                )
+            try:
+                video_id = processor.extract_video_id(url)
+                transcript = processor.extract_transcript(video_id)
+                
+                if transcript:
+                    # Store in database
+                    db.store_transcript(video_id, "Video Title", transcript)
+                    st.success("Transcript processed and stored successfully!")
+                else:
+                    st.error("No transcript available for this video.")
+            except Exception as e:
+                st.error(f"Error processing video: {str(e)}")
         else:
-            st.warning("Please enter a video URL")
+            st.warning("Please enter a valid YouTube URL")
 
-elif st.session_state.current_command == "process-playlist":
+elif st.session_state.current_command == "playlist":
     st.subheader("Process Playlist")
-    url = st.text_input("Enter YouTube playlist URL:")
+    url = st.text_input("Enter YouTube Playlist URL")
     batch_size = st.slider("Batch Size", min_value=1, max_value=10, value=5, 
                           help="Number of videos to process in each batch")
     
@@ -181,39 +133,42 @@ elif st.session_state.current_command == "process-playlist":
             The videos will be processed in batches to handle large playlists efficiently.
             You can monitor the progress below:
             """)
-            process_playlist(url, batch_size)
+            try:
+                videos = youtube.get_playlist_videos(url)
+                progress_bar = st.progress(0)
+                
+                for i, video in enumerate(videos):
+                    transcript = processor.extract_transcript(video['video_id'])
+                    if transcript:
+                        db.store_transcript(video['video_id'], video['title'], transcript)
+                    progress_bar.progress((i + 1) / len(videos))
+                
+                st.success(f"Processed {len(videos)} videos from playlist!")
+            except Exception as e:
+                st.error(f"Error processing playlist: {str(e)}")
         else:
-            st.warning("Please enter a playlist URL")
+            st.warning("Please enter a valid playlist URL")
 
 elif st.session_state.current_command == "search":
     st.subheader("Search Transcripts")
-    query = st.text_input("Enter search query:")
-    if st.button("Search", key="search_btn"):
-        if query:
-            with st.spinner("Searching..."):
-                results = db.search_transcripts(query)
-                if results:
-                    for result in results:
-                        video_url = f"https://youtube.com/watch?v={result['video_id']}"
-                        st.markdown(
-                            f"""<div class="search-result">
-                                <a href="{video_url}" target="_blank" class="video-link">{result['title']}</a>
-                                <p class="highlight-text">{result['highlight']}</p>
-                            </div>""",
-                            unsafe_allow_html=True
-                        )
-                else:
-                    st.info("No results found")
+    query = st.text_input("Enter search query")
+    
+    if query:
+        results = db.search_transcripts(query)
+        if results:
+            st.write(f"Found {len(results)} results:")
+            for result in results:
+                with st.expander(result['title']):
+                    st.markdown(f"""<div class="search-result">{result['highlight']}</div>""", 
+                              unsafe_allow_html=True)
         else:
-            st.warning("Please enter a search query")
+            st.info("No matching transcripts found")
 
 elif st.session_state.current_command == "list":
     st.subheader("All Transcripts")
     transcripts = db.get_all_transcripts()
     
-    if not transcripts:
-        st.info("No transcripts stored")
-    else:
+    if transcripts:
         # Create a grid layout
         cols = st.columns(3)
         for idx, t in enumerate(transcripts):
@@ -234,9 +189,10 @@ elif st.session_state.current_command == "list":
                     st.session_state.show_transcript_id = t['video_id']
                     st.session_state.current_command = "view_video"
                     st.rerun()
+    else:
+        st.info("No transcripts found in database")
 
-# Handle video viewing
-if st.session_state.current_command == "view_video" and st.session_state.show_transcript_id:
+elif st.session_state.current_command == "view_video" and st.session_state.show_transcript_id:
     with st.spinner("Loading video and transcript..."):
         # Get video details
         with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -277,231 +233,164 @@ if st.session_state.current_command == "view_video" and st.session_state.show_tr
                 # Back button
                 if st.button("← Back to List"):
                     st.session_state.show_transcript_id = None
-
-elif st.session_state.current_command == "export":
-    st.subheader("Export Transcripts")
-    export_format = st.selectbox(
-        "Select export format",
-        ["json", "csv", "txt"],
-        help="Choose the format for exporting your transcripts"
-    )
-    
-    if st.button("Export", key="export_btn"):
-        try:
-            data = db.export_transcripts(format=export_format)
-            if data:
-                st.download_button(
-                    label=f"Download {export_format.upper()} File",
-                    data=data,
-                    file_name=f"transcripts.{export_format}",
-                    mime={
-                        'json': 'application/json',
-                        'csv': 'text/csv',
-                        'txt': 'text/plain'
-                    }[export_format]
-                )
-            else:
-                st.info("No transcripts available to export")
-        except Exception as e:
-            st.error(f"Error exporting data: {str(e)}")
+                    st.session_state.current_command = "list"
+                    st.rerun()
 
 elif st.session_state.current_command == "analyze":
-    st.subheader("Analyze Transcript")
+    st.subheader("Basic Analysis")
     transcripts = db.get_all_transcripts()
     
-    if not transcripts:
-        st.info("No transcripts available for analysis")
-    else:
-        selected = st.selectbox(
-            "Select a transcript to analyze",
-            options=[(t['id'], t['title']) for t in transcripts],
-            format_func=lambda x: x[1]
-        )
+    if transcripts:
+        # Select transcript
+        titles = [t['title'] for t in transcripts]
+        selected_title = st.selectbox("Select transcript to analyze", titles)
         
-        if selected:
-            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
-            if transcript:
-                # Show text statistics
-                stats = parser.get_word_stats(transcript['transcript'])
-                st.write("### Text Statistics")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Word Count", stats['word_count'])
-                    st.metric("Sentence Count", stats['sentence_count'])
-                with col2:
-                    st.metric("Unique Words", stats['unique_words'])
-                    st.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
-                
-                # Show keywords
-                st.write("### Top Keywords")
-                keywords = parser.extract_keywords(transcript['transcript'])
-                st.bar_chart(
-                    {word: count for word, count in keywords}
-                )
-                
-                # Show AI-powered summary
-                st.write("### AI-Generated Summary")
-                max_words = st.slider("Maximum summary length (words)", 50, 500, 200)
-                with st.spinner("Generating AI summary..."):
-                    summary = parser.summarize_text(transcript['transcript'], max_words)
-                    if summary.startswith("Error"):
-                        st.error(summary)
-                    else:
-                        st.markdown(f"""<div class="transcript-viewer">{summary}</div>""", 
-                                  unsafe_allow_html=True)
-
-elif st.session_state.current_command == "compare":
-    st.subheader("Compare Transcripts")
-    transcripts = db.get_all_transcripts()
-    
-    if len(transcripts) < 2:
-        st.info("Need at least 2 transcripts for comparison")
-    else:
+        selected_transcript = next(t for t in transcripts if t['title'] == selected_title)
+        
+        # Show statistics
+        stats = parser.get_word_stats(selected_transcript['transcript'])
+        
         col1, col2 = st.columns(2)
-        
         with col1:
-            selected1 = st.selectbox(
-                "Select first transcript",
-                options=[(t['id'], t['title']) for t in transcripts],
-                format_func=lambda x: x[1],
-                key="compare1"
-            )
-        
+            st.metric("Word Count", stats['word_count'])
+            st.metric("Sentence Count", stats['sentence_count'])
         with col2:
-            selected2 = st.selectbox(
-                "Select second transcript",
-                options=[(t['id'], t['title']) for t in transcripts],
-                format_func=lambda x: x[1],
-                key="compare2"
-            )
-        
-        if selected1 and selected2 and selected1 != selected2:
-            transcript1 = next((t for t in transcripts if t['id'] == selected1[0]), None)
-            transcript2 = next((t for t in transcripts if t['id'] == selected2[0]), None)
+            st.metric("Unique Words", stats['unique_words'])
+            st.metric("Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
             
-            if transcript1 and transcript2:
-                # Compare statistics
-                stats1 = parser.get_word_stats(transcript1['transcript'])
-                stats2 = parser.get_word_stats(transcript2['transcript'])
-                
-                st.write("### Statistical Comparison")
-                metrics = {
-                    "Word Count": (stats1['word_count'], stats2['word_count']),
-                    "Sentence Count": (stats1['sentence_count'], stats2['sentence_count']),
-                    "Unique Words": (stats1['unique_words'], stats2['unique_words']),
-                    "Avg Words/Sentence": (
-                        round(stats1['avg_words_per_sentence'], 1),
-                        round(stats2['avg_words_per_sentence'], 1)
-                    )
-                }
-                
-                for metric, (val1, val2) in metrics.items():
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric(f"{metric} (1)", val1)
-                    with col2:
-                        st.metric(f"{metric} (2)", val2)
-                
-                # Compare keywords
-                st.write("### Keyword Comparison")
-                kw1 = dict(parser.extract_keywords(transcript1['transcript']))
-                kw2 = dict(parser.extract_keywords(transcript2['transcript']))
-                common_words = set(kw1.keys()) & set(kw2.keys())
-                
-                if common_words:
-                    st.write("Common keywords:")
-                    for word in common_words:
-                        st.write(f"- {word} ({kw1[word]} vs {kw2[word]} occurrences)")
-            
-    if st.button("← Back to List"):
-        st.session_state.current_command = "list"
-        st.rerun()
-elif st.session_state.current_command == "word_frequency":
+        # Show keywords
+        st.write("### Top Keywords")
+        keywords = parser.extract_keywords(selected_transcript['transcript'])
+        st.bar_chart(
+            {word: count for word, count in keywords}
+        )
+    else:
+        st.info("No transcripts available for analysis")
+
+elif st.session_state.current_command == "frequency":
     st.subheader("Word Frequency Analysis")
     transcripts = db.get_all_transcripts()
     
-    if not transcripts:
-        st.info("No transcripts available for analysis")
+    if transcripts:
+        titles = [t['title'] for t in transcripts]
+        selected_title = st.selectbox("Select transcript", titles)
+        
+        selected_transcript = next(t for t in transcripts if t['title'] == selected_title)
+        min_count = st.slider("Minimum word frequency", 2, 20, 5)
+        
+        frequencies = parser.get_word_frequency(selected_transcript['transcript'], min_count)
+        if frequencies:
+            st.bar_chart(
+                {word: count for word, count in frequencies}
+            )
+        else:
+            st.info(f"No words found with frequency >= {min_count}")
     else:
-        selected = st.selectbox(
-            "Select a transcript to analyze",
-            options=[(t['id'], t['title']) for t in transcripts],
-            format_func=lambda x: x[1],
-            key="word_freq"
-        )
-        
-        min_count = st.slider("Minimum word occurrence", 2, 20, 5)
-        
-        if selected:
-            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
-            if transcript:
-                word_freq = parser.get_word_frequency(transcript['transcript'], min_count)
-                
-                if word_freq:
-                    st.write("### Word Frequency Distribution")
-                    freq_data = {word: count for word, count in word_freq}
-                    st.bar_chart(freq_data)
-                else:
-                    st.info("No words meet the minimum frequency threshold")
+        st.info("No transcripts available for analysis")
 
-elif st.session_state.current_command == "key_phrases":
+elif st.session_state.current_command == "phrases":
     st.subheader("Key Phrases Analysis")
     transcripts = db.get_all_transcripts()
     
-    if not transcripts:
-        st.info("No transcripts available for analysis")
-    else:
-        selected = st.selectbox(
-            "Select a transcript to analyze",
-            options=[(t['id'], t['title']) for t in transcripts],
-            format_func=lambda x: x[1],
-            key="phrases"
-        )
+    if transcripts:
+        titles = [t['title'] for t in transcripts]
+        selected_title = st.selectbox("Select transcript", titles)
         
-        if selected:
-            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
-            if transcript:
-                col1, col2 = st.columns(2)
-                with col1:
-                    min_words = st.slider("Min words in phrase", 2, 5, 3)
-                with col2:
-                    max_words = st.slider("Max words in phrase", 3, 8, 6)
-                
-                phrases = parser.find_key_phrases(transcript['transcript'], min_words, max_words)
-                if phrases:
-                    st.write("### Most Common Phrases")
-                    for phrase, count in phrases:
-                        st.markdown(f"- **{phrase}** ({count} occurrences)")
-                else:
-                    st.info("No key phrases found with current settings")
+        selected_transcript = next(t for t in transcripts if t['title'] == selected_title)
+        
+        phrases = parser.find_key_phrases(selected_transcript['transcript'])
+        if phrases:
+            st.bar_chart(
+                {phrase: count for phrase, count in phrases}
+            )
+        else:
+            st.info("No key phrases found")
+    else:
+        st.info("No transcripts available for analysis")
 
-elif st.session_state.current_command == "time_segments":
-    st.subheader("Time-based Segments")
+elif st.session_state.current_command == "export":
+    st.subheader("Export Data")
+    format = st.selectbox("Select export format", ["json", "csv", "txt"])
+    
+    if st.button("Export"):
+        try:
+            data = db.export_transcripts(format)
+            if data:
+                st.download_button(
+                    label=f"Download {format.upper()} file",
+                    data=data,
+                    file_name=f"transcripts.{format}",
+                    mime=f"text/{format}"
+                )
+            else:
+                st.info("No data available to export")
+        except Exception as e:
+            st.error(f"Error exporting data: {str(e)}")
+
+elif st.session_state.current_command == "segments":
+    st.subheader("Time-based Segmentation")
+    transcripts = db.get_all_transcripts()
+    
+    if transcripts:
+        titles = [t['title'] for t in transcripts]
+        selected_title = st.selectbox("Select transcript", titles)
+        
+        selected_transcript = next(t for t in transcripts if t['title'] == selected_title)
+        segment_length = st.slider("Words per segment", 100, 500, 300)
+        
+        segments = parser.extract_time_segments(selected_transcript['transcript'], segment_length)
+        if segments:
+            st.write(f"### Transcript Segments ({len(segments)} total)")
+            for i, segment in enumerate(segments, 1):
+                with st.expander(f"Segment {i}"):
+                    st.write(segment)
+        else:
+            st.info("No segments available")
+    else:
+        st.info("No transcripts available for segmentation")
+
+elif st.session_state.current_command == "total_analysis":
+    st.subheader("Total Data Analysis")
     transcripts = db.get_all_transcripts()
     
     if not transcripts:
-        st.info("No transcripts available for segmentation")
+        st.info("No transcripts available for analysis")
     else:
-        selected = st.selectbox(
-            "Select a transcript to segment",
-            options=[(t['id'], t['title']) for t in transcripts],
-            format_func=lambda x: x[1],
-            key="segments"
+        # Combine all transcripts
+        combined_text = " ".join([t['transcript'] for t in transcripts])
+        
+        # Show total statistics
+        stats = parser.get_word_stats(combined_text)
+        st.write("### Combined Text Statistics")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Word Count", stats['word_count'])
+            st.metric("Total Sentence Count", stats['sentence_count'])
+        with col2:
+            st.metric("Total Unique Words", stats['unique_words'])
+            st.metric("Overall Avg Words/Sentence", f"{stats['avg_words_per_sentence']:.1f}")
+        
+        # Show keywords from all transcripts
+        st.write("### Top Keywords Across All Transcripts")
+        keywords = parser.extract_keywords(combined_text, top_n=20)
+        st.bar_chart(
+            {word: count for word, count in keywords}
         )
         
-        if selected:
-            transcript = next((t for t in transcripts if t['id'] == selected[0]), None)
-            if transcript:
-                words_per_segment = st.slider("Words per segment", 100, 500, 300)
-                segments = parser.extract_time_segments(transcript['transcript'], words_per_segment)
-                
-                st.write(f"### Transcript Segments ({len(segments)} total)")
-                for i, segment in enumerate(segments, 1):
-                    with st.expander(f"Segment {i}"):
-                        st.write(segment)
-else:
-                st.info("No transcripts available for segmentation")
-                
+        # Show AI-powered summary of all content
+        st.write("### AI-Generated Summary of All Content")
+        max_words = st.slider("Maximum summary length (words)", 100, 1000, 300)
+        with st.spinner("Generating AI summary of all content..."):
+            summary = parser.summarize_text(combined_text, max_words)
+            if summary.startswith("Error"):
+                st.error(summary)
+            else:
+                st.markdown(f"""<div class="transcript-viewer">{summary}</div>""", 
+                          unsafe_allow_html=True)
+        
+        # Display transcript count
+        st.metric("Total Number of Transcripts", len(transcripts))
+
 # Close main-content div
 st.markdown("</div>", unsafe_allow_html=True)
 
