@@ -19,44 +19,27 @@ class Database:
         
         while retry_count < max_retries:
             try:
+                # Basic connection parameters
                 conn_params = {
-                    'connect_timeout': 30,
-                    'keepalives': 1,
-                    'keepalives_idle': 30,
-                    'keepalives_interval': 10,
-                    'keepalives_count': 5,
-                    'options': '-c search_path=public -c client_min_messages=error'
+                    'application_name': 'youtube_transcript_processor',
+                    'connect_timeout': 10,
+                    'options': '-c search_path=public'
                 }
                 
+                # Establish connection
                 if os.environ.get('DATABASE_URL'):
-                    # Parse connection URL and set IPv4 parameters
-                    url = os.environ.get('DATABASE_URL')
-                    try:
-                        # Force IPv4
-                        import socket
-                        socket.setdefaulttimeout(30)
-                        socket.getaddrinfo('neon.tech', 5432, socket.AF_INET)
-                    
-                    print(f"Attempting database connection (attempt {retry_count + 1}/{max_retries})")
-                    # Use psycopg2.connect with retries and IPv4
                     self.conn = psycopg2.connect(
-                        url,
-                        **conn_params,
-                        keepalives_idle=30,
-                        keepalives_interval=10,
-                        keepalives_count=5,
-                        application_name='youtube_transcript_processor'
+                        os.environ['DATABASE_URL'],
+                        **conn_params
                     )
                 else:
-                    # Fallback to parameter-based connection with IPv4
                     self.conn = psycopg2.connect(
                         dbname=os.environ.get('PGDATABASE'),
                         user=os.environ.get('PGUSER'),
                         password=os.environ.get('PGPASSWORD'),
                         host=os.environ.get('PGHOST'),
                         port=os.environ.get('PGPORT'),
-                        **conn_params,
-                        application_name='youtube_transcript_processor'
+                        **conn_params
                     )
                 
                 # Set session parameters

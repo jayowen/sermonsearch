@@ -9,12 +9,21 @@ from utils.transcript_processor import TranscriptProcessor
 from utils.youtube_helper import YouTubeHelper
 
 # Initialize components
-try:
-    db = Database()
-    parser = CommandParser()
-except Exception as e:
-    st.error(f"Failed to connect to the database. Please try again later.")
-    st.stop()
+def init_database():
+    max_retries = 3
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            return Database()
+        except Exception as e:
+            retry_count += 1
+            if retry_count == max_retries:
+                st.error(f"Failed to connect to the database after {max_retries} attempts. Please try again later.")
+                st.stop()
+            time.sleep(2)  # Wait before retrying
+
+db = init_database()
+parser = CommandParser()
 
 def process_video(url: str) -> str:
     """Process a single YouTube video."""
@@ -203,6 +212,13 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("ℹ️ Command Help"):
         st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
+
+# Configure page and add custom styles
+st.set_page_config(
+    page_title="YouTube Transcript Processor",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Add custom styles and header
 st.markdown("""
@@ -442,8 +458,8 @@ elif st.session_state.current_command == "compare":
             
             if transcript1 and transcript2:
                 # Compare statistics
-                stats1 = command_parser.get_word_stats(transcript1['transcript'])
-                stats2 = command_parser.get_word_stats(transcript2['transcript'])
+                stats1 = parser.get_word_stats(transcript1['transcript'])
+                stats2 = parser.get_word_stats(transcript2['transcript'])
                 
                 st.write("### Statistical Comparison")
                 metrics = {
@@ -465,8 +481,8 @@ elif st.session_state.current_command == "compare":
                 
                 # Compare keywords
                 st.write("### Keyword Comparison")
-                kw1 = dict(command_parser.extract_keywords(transcript1['transcript']))
-                kw2 = dict(command_parser.extract_keywords(transcript2['transcript']))
+                kw1 = dict(parser.extract_keywords(transcript1['transcript']))
+                kw2 = dict(parser.extract_keywords(transcript2['transcript']))
                 common_words = set(kw1.keys()) & set(kw2.keys())
                 
                 if common_words:
