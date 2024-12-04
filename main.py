@@ -385,12 +385,12 @@ elif st.session_state.current_command == "analyze":
                     {word: count for word, count in keywords}
                 )
                 
-                # Show summary
-                st.write("### Summary")
-                summary_length = st.slider("Number of sentences in summary", 1, 10, 3)
-                with st.spinner("Generating summary..."):
-                    summary = parser.summarize_text(transcript['transcript'], summary_length)
-                    if summary.startswith("Error") or summary.startswith("Could not"):
+                # Show AI-powered summary
+                st.write("### AI-Generated Summary")
+                max_words = st.slider("Maximum summary length (words)", 50, 500, 200)
+                with st.spinner("Generating AI summary..."):
+                    summary = parser.summarize_text(transcript['transcript'], max_words)
+                    if summary.startswith("Error"):
                         st.error(summary)
                     else:
                         st.markdown(f"""<div class="transcript-viewer">{summary}</div>""", 
