@@ -98,6 +98,9 @@ class Database:
     def update_categories(self, video_id: str, categories: Dict[str, list]) -> bool:
         """Update categories for a transcript."""
         try:
+            print(f"Updating categories for video_id: {video_id}")
+            print(f"Categories to update: {categories}")
+            
             # First get the transcript_id
             transcript = self.get_transcript(video_id)
             if not transcript:
@@ -105,24 +108,33 @@ class Database:
                 return False
                 
             transcript_id = transcript['id']
+            print(f"Found transcript_id: {transcript_id}")
             
             # Then update categories
-            result = self.supabase.table('categories').upsert({
+            data = {
                 'transcript_id': transcript_id,
                 'christian_life': categories.get('christian_life', []),
                 'church_ministry': categories.get('church_ministry', []),
                 'theology': categories.get('theology', [])
-            }).execute()
+            }
+            print(f"Preparing to upsert categories with data: {data}")
+            
+            result = self.supabase.table('categories').upsert(data).execute()
+            
+            print(f"Category update result: {result.data if hasattr(result, 'data') else 'No data'}")
             
             if not result.data:
                 print("No data returned from categories update")
                 return False
-                
+            
+            print("Categories updated successfully")    
             return True
         except Exception as e:
             print(f"Error updating categories: {str(e)}")
             if hasattr(e, 'response'):
                 print(f"Response details: {e.response}")
+            if hasattr(e, '__dict__'):
+                print(f"Error details: {e.__dict__}")
             return False
 
     def video_exists(self, video_id: str) -> Optional[Dict[str, Any]]:
@@ -222,34 +234,63 @@ class Database:
     def update_personal_stories(self, video_id: str, stories: List[Dict[str, str]]) -> bool:
         """Update personal stories for a transcript."""
         try:
+            print(f"Updating personal stories for video_id: {video_id}")
+            print(f"Stories to update: {stories}")
+            
             # First get transcript id
             transcript = self.get_transcript(video_id)
             if not transcript:
+                print(f"No transcript found for video_id: {video_id}")
                 return False
                 
             transcript_id = transcript['id']
+            print(f"Found transcript_id: {transcript_id}")
             
             # Begin by removing old relationships
-            self.supabase.table('transcript_stories').delete().eq('transcript_id', transcript_id).execute()
+            try:
+                delete_result = self.supabase.table('transcript_stories').delete().eq('transcript_id', transcript_id).execute()
+                print(f"Deleted old relationships: {delete_result.data if hasattr(delete_result, 'data') else 'No data'}")
+            except Exception as e:
+                print(f"Error deleting old relationships: {str(e)}")
             
             # Insert new stories and create relationships
+            successful_stories = 0
             for story in stories:
-                # Insert story
-                story_result = self.supabase.table('stories').insert({
-                    'title': story['title'],
-                    'summary': story['summary'],
-                    'message': story['message']
-                }).execute()
-                
-                if story_result.data:
-                    # Create relationship
-                    story_id = story_result.data[0]['id']
-                    self.supabase.table('transcript_stories').insert({
-                        'transcript_id': transcript_id,
-                        'story_id': story_id
-                    }).execute()
+                try:
+                    print(f"Inserting story: {story['title']}")
+                    # Insert story
+                    story_data = {
+                        'title': story['title'],
+                        'summary': story['summary'],
+                        'message': story['message']
+                    }
+                    story_result = self.supabase.table('stories').insert(story_data).execute()
+                    
+                    if story_result.data:
+                        # Create relationship
+                        story_id = story_result.data[0]['id']
+                        print(f"Story inserted with id: {story_id}")
+                        
+                        relation_data = {
+                            'transcript_id': transcript_id,
+                            'story_id': story_id
+                        }
+                        relation_result = self.supabase.table('transcript_stories').insert(relation_data).execute()
+                        print(f"Relationship created: {relation_result.data if hasattr(relation_result, 'data') else 'No data'}")
+                        successful_stories += 1
+                    else:
+                        print(f"Failed to insert story: {story['title']}")
+                except Exception as e:
+                    print(f"Error processing story {story['title']}: {str(e)}")
+                    if hasattr(e, 'response'):
+                        print(f"Response details: {e.response}")
             
-            return True
+            print(f"Successfully processed {successful_stories} out of {len(stories)} stories")
+            return successful_stories > 0
         except Exception as e:
             print(f"Error updating personal stories: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
+            if hasattr(e, '__dict__'):
+                print(f"Error details: {e.__dict__}")
             return False
