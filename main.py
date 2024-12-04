@@ -87,8 +87,16 @@ if st.session_state.current_command == "process":
                         parser = CommandParser()
                         ai_summary = parser.summarize_text(transcript, max_length=250)
                     
+                    # Get video title from YouTube API
+                    try:
+                        video_info = youtube.get_video_info(video_id)
+                        video_title = video_info['title']
+                    except Exception as e:
+                        video_title = f"Video {video_id}"
+                        st.warning(f"Could not fetch video title: {str(e)}")
+                    
                     # Store in database with summary
-                    db.store_transcript(video_id, "Video Title", transcript, ai_summary)
+                    db.store_transcript(video_id, video_title, transcript, ai_summary)
                     st.success("Transcript processed and AI summary generated successfully!")
                 else:
                     st.error("No transcript available for this video.")

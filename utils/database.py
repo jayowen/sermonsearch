@@ -78,7 +78,7 @@ class Database:
             """)
             self.conn.commit()
 
-    def store_transcript(self, video_id: str, title: str, transcript: str, ai_summary: str = None):
+    def store_transcript(self, video_id: str, title: str, transcript: str, ai_summary: str = None) -> None:
         """Store a transcript and its AI summary in the database."""
         with self.conn.cursor() as cur:
             cur.execute("""

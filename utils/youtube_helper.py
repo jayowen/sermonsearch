@@ -50,3 +50,26 @@ class YouTubeHelper:
             if match:
                 return match.group(1)
         raise ValueError("Invalid playlist URL")
+
+    @staticmethod
+    def get_video_info(video_id: str) -> Dict[str, str]:
+        """Get video information from YouTube API."""
+        youtube = build('youtube', 'v3', developerKey=os.environ.get('YOUTUBE_API_KEY'))
+        
+        try:
+            request = youtube.videos().list(
+                part="snippet",
+                id=video_id
+            )
+            response = request.execute()
+            
+            if response['items']:
+                return {
+                    'title': response['items'][0]['snippet']['title'],
+                    'description': response['items'][0]['snippet']['description']
+                }
+            else:
+                raise ValueError("Video not found")
+                
+        except Exception as e:
+            raise Exception(f"Error fetching video info: {str(e)}")
