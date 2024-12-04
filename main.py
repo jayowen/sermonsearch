@@ -3,12 +3,7 @@ import streamlit as st
 st.set_page_config(
     page_title="YouTube Transcript Processor",
     layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': None,
-        'Report a bug': None,
-        'About': None
-    }
+    initial_sidebar_state="expanded"
 )
 
 import os
@@ -20,30 +15,25 @@ from utils.database import Database
 from utils.transcript_processor import TranscriptProcessor
 from utils.youtube_helper import YouTubeHelper
 
-# Apply custom styling
+# Basic styling for consistency
 st.markdown("""
     <style>
     .stApp {
-        max-width: 1200px;
-        margin: 0 auto;
         font-family: monospace;
     }
-    .main .block-container {
-        padding-top: 2rem;
-    }
-    header {
-        background-color: #0E1117;
-        padding: 1rem 0;
-    }
-    h1 {
-        color: #00ff00 !important;
-        text-align: center;
-        padding: 1rem;
-        border-bottom: 2px solid #00ff00;
-        margin-bottom: 2rem;
+    .stDeployButton {
+        display: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Simple header with consistent styling
+st.markdown(
+    "<h1 style='text-align: center; color: #00ff00; padding: 1rem 0; border-bottom: 2px solid #00ff00;'>"
+    "YouTube Transcript Processor"
+    "</h1>",
+    unsafe_allow_html=True
+)
 
 # Initialize database connection
 def init_database():
@@ -51,15 +41,23 @@ def init_database():
     try:
         return Database()
     except Exception as e:
-        st.error("Database connection error. The application will continue without database features.")
+        st.warning("🔄 Attempting to connect to database...")
         return None
 
 # Initialize database in session state to persist across reruns
 if 'db' not in st.session_state:
     st.session_state.db = init_database()
 
+# Get database connection
 db = st.session_state.db
 parser = CommandParser()
+
+# Show database status in sidebar
+with st.sidebar:
+    if db is None:
+        st.warning("⚠️ Database disconnected")
+    else:
+        st.success("✅ Database connected")
 
 def process_video(url: str) -> str:
     """Process a single YouTube video."""
@@ -493,9 +491,11 @@ elif st.session_state.current_command == "time_segments":
                 for i, segment in enumerate(segments, 1):
                     with st.expander(f"Segment {i}"):
                         st.write(segment)
+else:
+                st.info("No transcripts available for segmentation")
+                
 # Close main-content div
 st.markdown("</div>", unsafe_allow_html=True)
 
-else:
-    if not st.session_state.current_command:
-        st.info("👈 Select a command from the sidebar to get started")
+if not st.session_state.current_command:
+    st.info("👈 Select a command from the sidebar to get started")
