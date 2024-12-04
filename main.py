@@ -382,12 +382,23 @@ elif st.session_state.current_command == "total_analysis":
         st.write("### AI-Generated Summary of All Content")
         max_words = st.slider("Maximum summary length (words)", 100, 1000, 300)
         with st.spinner("Generating AI summary of all content..."):
-            summary = parser.summarize_text(combined_text, max_words)
-            if summary.startswith("Error"):
-                st.error(summary)
-            else:
-                st.markdown(f"""<div class="transcript-viewer">{summary}</div>""", 
+            # Split text into chunks of roughly 100k characters to stay within token limits
+            chunk_size = 100000
+            chunks = [combined_text[i:i + chunk_size] for i in range(0, len(combined_text), chunk_size)]
+            
+            summaries = []
+            for i, chunk in enumerate(chunks, 1):
+                st.write(f"Processing chunk {i} of {len(chunks)}...")
+                chunk_summary = parser.summarize_text(chunk, max_words // len(chunks))
+                if not chunk_summary.startswith("Error"):
+                    summaries.append(chunk_summary)
+            
+            if summaries:
+                final_summary = " ".join(summaries)
+                st.markdown(f"""<div class="transcript-viewer">{final_summary}</div>""", 
                           unsafe_allow_html=True)
+            else:
+                st.error("Unable to generate summary. Text might be too long or an error occurred.")
         
         # Display transcript count
         st.metric("Total Number of Transcripts", len(transcripts))
