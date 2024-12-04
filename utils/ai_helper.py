@@ -166,7 +166,7 @@ Here's the sermon transcript to analyze:
                 model="claude-3-haiku-20240307",
                 max_tokens=1024,
                 temperature=0.7,
-                system="You are an expert at analyzing sermon transcripts and identifying personal stories and anecdotes. Extract meaningful stories that illustrate key points.",
+                system="You are an expert at analyzing sermon transcripts and identifying personal stories and anecdotes. Extract meaningful stories that illustrate key points. Always respond with valid JSON containing a 'stories' array, even if no stories are found. Ensure your response can be parsed as JSON.",
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
@@ -177,12 +177,25 @@ Here's the sermon transcript to analyze:
             import re
 
             response_text = message.content[0].text
-            # Find JSON-like structure in the response
-            json_match = re.search(r'\{[\s\S]*\}', response_text)
-            if json_match:
-                response_text = json_match.group(0)
-
-            parsed_data = json.loads(response_text)
+            
+            try:
+                # First try direct JSON parsing
+                parsed_data = json.loads(response_text)
+            except json.JSONDecodeError:
+                # If direct parsing fails, try to extract JSON structure
+                json_match = re.search(r'\{[\s\S]*?\}(?=\s*$)', response_text)
+                if json_match:
+                    try:
+                        parsed_data = json.loads(json_match.group(0))
+                    except json.JSONDecodeError:
+                        # If still failing, create a basic structure
+                        parsed_data = {"stories": []}
+                else:
+                    parsed_data = {"stories": []}
+                
+            # Ensure we have a valid stories array
+            if not isinstance(parsed_data, dict) or "stories" not in parsed_data:
+                parsed_data = {"stories": []}
 
             # Add debug information
             debug_info = {
