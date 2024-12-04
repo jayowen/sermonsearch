@@ -87,7 +87,7 @@ class Database:
                 ON CONFLICT (video_id) DO UPDATE
                 SET transcript = EXCLUDED.transcript,
                     title = EXCLUDED.title,
-                    ai_summary = EXCLUDED.ai_summary
+                    ai_summary = EXCLUDED.ai_summary;
             """, (video_id, title, transcript, ai_summary))
             self.conn.commit()
 
