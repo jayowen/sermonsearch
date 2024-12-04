@@ -388,8 +388,13 @@ elif st.session_state.current_command == "analyze":
                 # Show summary
                 st.write("### Summary")
                 summary_length = st.slider("Number of sentences in summary", 1, 10, 3)
-                summary = parser.summarize_text(transcript['transcript'], summary_length)
-                st.write(summary)
+                with st.spinner("Generating summary..."):
+                    summary = parser.summarize_text(transcript['transcript'], summary_length)
+                    if summary.startswith("Error") or summary.startswith("Could not"):
+                        st.error(summary)
+                    else:
+                        st.markdown(f"""<div class="transcript-viewer">{summary}</div>""", 
+                                  unsafe_allow_html=True)
 
 elif st.session_state.current_command == "compare":
     st.subheader("Compare Transcripts")

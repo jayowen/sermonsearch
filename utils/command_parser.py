@@ -79,24 +79,39 @@ class CommandParser:
     @staticmethod
     def summarize_text(text: str, sentences: int = 3) -> str:
         """Create a simple extractive summary of the text."""
-        # Split into sentences and tokenize
-        sents = sent_tokenize(text)
-        words = word_tokenize(text.lower())
-        
-        # Remove stopwords and get word frequencies
-        stop_words = set(stopwords.words('english'))
-        word_freq = Counter(w for w in words if w.isalnum() and w not in stop_words)
-        
-        # Score sentences based on word frequencies
-        sent_scores = []
-        for sent in sents:
-            score = sum(word_freq.get(word.lower(), 0) 
-                       for word in word_tokenize(sent) 
-                       if word.lower() not in stop_words)
-            sent_scores.append((sent, score))
-        
-        # Get top sentences
-        summary_sents = sorted(sent_scores, key=lambda x: x[1], reverse=True)[:sentences]
-        summary_sents = sorted(summary_sents, key=lambda x: sents.index(x[0]))
-        
-        return ' '.join(sent for sent, score in summary_sents)
+        try:
+            if not text or not isinstance(text, str):
+                return "No text available for summarization."
+
+            # Split into sentences and tokenize
+            sents = sent_tokenize(text)
+            if not sents:
+                return "Could not extract sentences from the text."
+                
+            # Limit sentences to available length
+            sentences = min(sentences, len(sents))
+            
+            words = word_tokenize(text.lower())
+            
+            # Remove stopwords and get word frequencies
+            stop_words = set(stopwords.words('english'))
+            word_freq = Counter(w for w in words if w.isalnum() and w not in stop_words)
+            
+            # Score sentences based on word frequencies
+            sent_scores = []
+            for sent in sents:
+                score = sum(word_freq.get(word.lower(), 0) 
+                          for word in word_tokenize(sent) 
+                          if word.lower() not in stop_words)
+                sent_scores.append((sent, score))
+            
+            # Get top sentences
+            summary_sents = sorted(sent_scores, key=lambda x: x[1], reverse=True)[:sentences]
+            summary_sents = sorted(summary_sents, key=lambda x: sents.index(x[0]))
+            
+            summary = ' '.join(sent for sent, score in summary_sents)
+            return summary if summary else "Could not generate summary."
+            
+        except Exception as e:
+            print(f"Error in summarize_text: {str(e)}")
+            return "An error occurred while generating the summary."
