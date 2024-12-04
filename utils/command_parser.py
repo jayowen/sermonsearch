@@ -139,10 +139,16 @@ class CommandParser:
             if not text or not isinstance(text, str):
                 return "No text available for summarization."
 
+            if len(text.strip()) < 100:  # Don't summarize very short texts
+                return text
+
             from utils.ai_helper import AIHelper
             ai = AIHelper()
-            return ai.generate_summary(text, max_length)
+            summary = ai.generate_summary(text, max_length)
+            return summary if summary else "Summary generation skipped."
             
+        except ImportError:
+            return "AI summarization not available."
         except Exception as e:
             print(f"Error in summarize_text: {str(e)}")
-            return f"An error occurred while generating the summary: {str(e)}"
+            return "Summary generation failed."

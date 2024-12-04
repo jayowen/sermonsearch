@@ -4,9 +4,10 @@ from typing import Optional
 
 class AIHelper:
     def __init__(self):
-        self.client = anthropic.Anthropic(
-            api_key=os.environ.get('ANTHROPIC_API_KEY')
-        )
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not api_key:
+            raise ImportError("ANTHROPIC_API_KEY not found in environment")
+        self.client = anthropic.Anthropic(api_key=api_key)
 
     def generate_summary(self, text: str, max_length: Optional[int] = None) -> str:
         """Generate a summary of the given text using Claude AI."""

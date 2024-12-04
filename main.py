@@ -78,7 +78,28 @@ if st.session_state.current_command == "process":
         if url:
             try:
                 video_id = processor.extract_video_id(url)
-                transcript = processor.extract_transcript(video_id)
+                
+                # Check if video already exists
+                existing_video = db.video_exists(video_id)
+                if existing_video:
+                    st.info(f"This video '{existing_video['title']}' is already in the system.")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("View Existing"):
+                            st.session_state.show_transcript_id = video_id
+                            st.session_state.current_command = "view_video"
+                            st.rerun()
+                    with col2:
+                        if st.button("Re-process"):
+                            transcript = processor.extract_transcript(video_id)
+                            if not transcript:
+                                st.error("No transcript available for this video.")
+                                return
+                else:
+                    transcript = processor.extract_transcript(video_id)
+                    if not transcript:
+                        st.error("No transcript available for this video.")
+                        return
                 
                 if transcript:
                     # Generate AI summary
@@ -102,8 +123,6 @@ if st.session_state.current_command == "process":
                     st.session_state.show_transcript_id = video_id
                     st.session_state.current_command = "view_video"
                     st.rerun()
-                else:
-                    st.error("No transcript available for this video.")
             except Exception as e:
                 st.error(f"Error processing video: {str(e)}")
         else:
@@ -124,17 +143,39 @@ elif st.session_state.current_command == "playlist":
             """)
             try:
                 videos = youtube.get_playlist_videos(url)
-                progress_bar = st.progress(0)
                 
-                for i, video in enumerate(videos):
-                    transcript = processor.extract_transcript(video['video_id'])
-                    if transcript:
-                        # Generate AI summary for each video
-                        ai_summary = parser.summarize_text(transcript, max_length=250)
-                        db.store_transcript(video['video_id'], video['title'], transcript, ai_summary)
-                    progress_bar.progress((i + 1) / len(videos))
+                # Check for existing videos first
+                existing_videos = []
+                new_videos = []
+                for video in videos:
+                    if db.video_exists(video['video_id']):
+                        existing_videos.append(video)
+                    else:
+                        new_videos.append(video)
                 
-                st.success(f"Processed {len(videos)} videos from playlist!")
+                if existing_videos:
+                    st.info(f"Found {len(existing_videos)} videos that are already in the system.")
+                    if st.button("Re-process all"):
+                        new_videos.extend(existing_videos)
+                    else:
+                        st.write("Will only process new videos.")
+                
+                if new_videos:
+                    progress_bar = st.progress(0)
+                    processed_count = 0
+                    
+                    for i, video in enumerate(new_videos):
+                        transcript = processor.extract_transcript(video['video_id'])
+                        if transcript:
+                            # Generate AI summary for each video
+                            ai_summary = parser.summarize_text(transcript, max_length=250)
+                            db.store_transcript(video['video_id'], video['title'], transcript, ai_summary)
+                            processed_count += 1
+                        progress_bar.progress((i + 1) / len(new_videos))
+                    
+                    st.success(f"Processed {processed_count} videos from playlist!")
+                else:
+                    st.info("No new videos to process.")
             except Exception as e:
                 st.error(f"Error processing playlist: {str(e)}")
         else:

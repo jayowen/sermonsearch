@@ -70,8 +70,20 @@ class Database:
                     video_id VARCHAR(20) UNIQUE NOT NULL,
                     title TEXT NOT NULL,
                     transcript TEXT NOT NULL,
+                    ai_summary TEXT,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
+                
+                -- Add ai_summary column if it doesn't exist
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'transcripts' AND column_name = 'ai_summary'
+                    ) THEN
+                        ALTER TABLE transcripts ADD COLUMN ai_summary TEXT;
+                    END IF;
+                END $$;
                 
                 CREATE INDEX IF NOT EXISTS idx_transcript_search 
                 ON transcripts USING gin(to_tsvector('english', transcript));
@@ -155,3 +167,9 @@ class Database:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SELECT * FROM transcripts ORDER BY created_at DESC")
             return cur.fetchall()
+    def video_exists(self, video_id: str) -> Dict[str, Any]:
+        """Check if a video exists in the database and return its info if it does."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, title FROM transcripts WHERE video_id = %s", (video_id,))
+            return cur.fetchone()
+
