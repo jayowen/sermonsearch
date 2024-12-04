@@ -480,12 +480,10 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                         with st.spinner("Generating AI summary..."):
                             summary = ai_helper.generate_summary(result['transcript'])
                             # Update the database with the new summary
-                            with db.conn.cursor() as cur:
-                                cur.execute(
-                                    "UPDATE transcripts SET ai_summary = %s WHERE video_id = %s",
-                                    (summary, st.session_state.show_transcript_id)
-                                )
-                                db.conn.commit()
+                            if db.update_transcript_summary(st.session_state.show_transcript_id, summary):
+                                st.success("Summary generated successfully!")
+                            else:
+                                st.error("Failed to update summary")
                             st.rerun()
 
                 # Display key statistics
