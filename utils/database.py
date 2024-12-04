@@ -7,14 +7,27 @@ import csv
 
 class Database:
     def __init__(self):
-        supabase_url = os.environ.get("SUPABASE_URL", "").strip()
-        supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
-        if not supabase_url or not supabase_key:
-            raise ValueError("Missing Supabase credentials")
+        self.supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+        self.supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
+        
+        # Validate credentials
+        if not self.supabase_url:
+            print("Error: SUPABASE_URL is missing or empty")
+            raise ValueError("Missing SUPABASE_URL")
+        if not self.supabase_key:
+            print("Error: SUPABASE_KEY is missing or empty")
+            raise ValueError("Missing SUPABASE_KEY")
+            
         try:
-            self.supabase: Client = create_client(supabase_url, supabase_key)
+            print(f"Initializing Supabase client with URL length: {len(self.supabase_url)}, Key length: {len(self.supabase_key)}")
+            self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
+            # Test connection
+            self.supabase.auth.get_user()
+            print("Successfully initialized Supabase client and verified connection")
         except Exception as e:
             print(f"Error initializing Supabase client: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
             raise
 
     def insert_transcript(self, video_id: str, title: str, transcript: str) -> Optional[str]:
