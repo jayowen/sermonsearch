@@ -1,0 +1,16 @@
+OperationalError: connection to server at "ep-ancient-field-a4gi4mpj.us-east-1.aws.neon.tech" (2600:1f18:240c:543b:a8aa:14fb:d008:11fe), port 5432 failed: Cannot assign requested address Is the server running on that host and accepting TCP/IP connections? connection to server at "ep-ancient-field-a4gi4mpj.us-east-1.aws.neon.tech" (2600:1f18:240c:5454:82a4:8209:20f8:a5c1), port 5432 failed: Cannot assign requested address Is the server running on that host and accepting TCP/IP connections? connection to server at "ep-ancient-field-a4gi4mpj.us-east-1.aws.neon.tech" (2600:1f18:240c:5419:4ecf:2a7c:cf52:31ae), port 5432 failed: Cannot assign requested address Is the server running on that host and accepting TCP/IP connections? connection to server at "ep-ancient-field-a4gi4mpj.us-east-1.aws.neon.tech" (2600:1f18:240c:544d:621b:957c:81:5e5b), port 5432 failed: Cannot assign requested address Is the server running on that host and accepting TCP/IP connections? connection to server at "ep-ancient-field-a4gi4mpj.us-east-1.aws.neon.tech" (2600:1f18:240c:5421:acd1:6284:5a8a:d6e9), port 5432 failed: Cannot assign requested address Is the server running on that host and accepting TCP/IP connections? connection to server at "ep-ancient-field-a4gi4mpj.us-east-1.aws.neon.tech" (2600:1f18:240c:540b:c14a:4d57:1251:234d), port 5432 failed: Cannot assign requested address Is the server running on that host and accepting TCP/IP connections?
+Traceback:
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 88, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 579, in code_to_exec
+    exec(code, module.__dict__)
+File "/home/runner/workspace/main.py", line 12, in <module>
+    db = Database()
+         ^^^^^^^^^^
+File "/home/runner/workspace/utils/database.py", line 9, in __init__
+    self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
