@@ -87,16 +87,31 @@ class Database:
     def update_categories(self, video_id: str, categories: Dict[str, list]) -> bool:
         """Update categories for a transcript."""
         try:
+            # First get the transcript_id
+            transcript = self.get_transcript(video_id)
+            if not transcript:
+                print(f"No transcript found for video_id: {video_id}")
+                return False
+                
+            transcript_id = transcript['id']
+            
+            # Then update categories
             result = self.supabase.table('categories').upsert({
-                'video_id': video_id,
+                'transcript_id': transcript_id,
                 'christian_life': categories.get('christian_life', []),
                 'church_ministry': categories.get('church_ministry', []),
                 'theology': categories.get('theology', [])
             }).execute()
             
-            return bool(result.data)
+            if not result.data:
+                print("No data returned from categories update")
+                return False
+                
+            return True
         except Exception as e:
             print(f"Error updating categories: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
             return False
 
     def video_exists(self, video_id: str) -> Optional[Dict[str, Any]]:
