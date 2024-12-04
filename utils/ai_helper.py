@@ -57,14 +57,19 @@ class AIHelper:
             if len(text) > max_chars:
                 text = text[:max_chars] + "..."
 
-            # Create a prompt that asks for categorization
-            prompt = """Please analyze this sermon transcript and categorize it into the following three category types:
+            # Create a prompt that asks for categorization with explicit category lists
+            prompt = """Please analyze this sermon transcript and categorize it into the following three category types. Only use categories from these exact lists:
 
-1. Christian Life (e.g., Abortion, Adoption, Anxiety, Community, Dating, Marriage, etc.)
-2. Church & Ministry (e.g., Baptism, Church, Discipleship, Leadership, Missions, etc.)
-3. Theology (e.g., Creation, Salvation, Sin, The Bible, The Gospel, etc.)
+1. Christian Life - Choose from:
+Abortion, Abuse, Adoption, Anger, Anxiety, Community, Current Events, Dating, Death, Discipline, Divorce, Education, Fatherhood, Fear, Finances, Forgiveness, Gender, Holiness, Hypocrisy, Identity, Idolatry, Joy, Marriage, Motherhood, Peace, Politics, Pride, Purity, Race, Relationships, Rest, Sexuality, Singleness, Suffering, Suicide, Technology, Wisdom, Work
 
-For each category type, return only the most relevant categories. Please format your response as a JSON object with three arrays.
+2. Church & Ministry - Choose from:
+Adults, Baptism, Care, Church, Church Planting, Church-Planting, Connections, Disciple Groups, Discipleship, Faith, Family Discipleship, Fasting, Giving, Global Missions, Grace, Kids, Leadership, Local Missions, Men, Missional Living, Missions, Multisite, Persecution, Prayer, School of Ministry, Serving, Students, The Church of Eleven22, Women, World Religions, Worship
+
+3. Theology - Choose from:
+Creation, End Times, False Teaching, Heaven and Hell, Revelation, Salvation, Sanctification, Sin, Sound Doctrine, Spiritual Gifts, Spiritual Warfare, The Bible, The Birth of Christ, The Character of God, The Death of Christ, The Fall, The Gathering, The Gospel, The Holy Spirit, The Kingdom of God, The Law, The Lord's Supper, The Ministry of Christ, The Resurrection of Christ, The Return of Christ, The Sovereignty of God, Theology, Trinitarianism, Union with Christ
+
+Only select categories that are explicitly mentioned or strongly implied in the transcript. Format your response as a JSON object with three arrays containing ONLY categories from the above lists.
 Example format:
 {
     "christian_life": ["Marriage", "Community"],

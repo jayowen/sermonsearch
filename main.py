@@ -345,32 +345,52 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
             with categories_tab:
                 st.markdown("### Categories")
                 
-                # Display current categories
+                # Get current categories
+                current_categories = categories if categories else {
+                    'christian_life': [],
+                    'church_ministry': [],
+                    'theology': []
+                }
+                
+                # Create columns for each category type
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
                     st.markdown("**The Christian Life**")
-                    if categories.get('christian_life'):
-                        for cat in categories['christian_life']:
-                            st.markdown(f"- {cat}")
-                    else:
-                        st.info("No categories selected")
+                    selected_christian = st.multiselect(
+                        "Select Christian Life categories",
+                        options=CHRISTIAN_LIFE_CATEGORIES,
+                        default=current_categories.get('christian_life', [])
+                    )
                 
                 with col2:
                     st.markdown("**Church & Ministry**")
-                    if categories.get('church_ministry'):
-                        for cat in categories['church_ministry']:
-                            st.markdown(f"- {cat}")
-                    else:
-                        st.info("No categories selected")
+                    selected_ministry = st.multiselect(
+                        "Select Church & Ministry categories",
+                        options=CHURCH_MINISTRY_CATEGORIES,
+                        default=current_categories.get('church_ministry', [])
+                    )
                 
                 with col3:
                     st.markdown("**Theology**")
-                    if categories.get('theology'):
-                        for cat in categories['theology']:
-                            st.markdown(f"- {cat}")
+                    selected_theology = st.multiselect(
+                        "Select Theology categories",
+                        options=THEOLOGY_CATEGORIES,
+                        default=current_categories.get('theology', [])
+                    )
+                
+                # Add button to save manual changes
+                if st.button("Save Category Changes"):
+                    new_categories = {
+                        'christian_life': selected_christian,
+                        'church_ministry': selected_ministry,
+                        'theology': selected_theology
+                    }
+                    if db.update_categories(st.session_state.show_transcript_id, new_categories):
+                        st.success("Categories updated successfully!")
+                        st.rerun()
                     else:
-                        st.info("No categories selected")
+                        st.error("Failed to update categories")
                 
                 # Add button to regenerate categories
                 col1, col2 = st.columns(2)
