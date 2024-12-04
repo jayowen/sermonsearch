@@ -215,9 +215,14 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                 # Display AI Summary if available
                 if result.get('ai_summary'):
                     st.markdown("### AI Summary")
+                    # Remove any prefix text about word count or summary
+                    summary = result['ai_summary']
+                    summary = summary.replace("Here is a concise summary of the transcript:", "")
+                    summary = summary.replace("Here is a summary of the key points from the transcript:", "")
+                    summary = summary.strip()
                     st.markdown(
                         f"""<div class="transcript-viewer">
-                            {result['ai_summary']}
+                            {summary}
                         </div>""",
                         unsafe_allow_html=True
                     )
@@ -238,14 +243,14 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                 keywords = parser.extract_keywords(result['transcript'])
                 st.bar_chart({word: count for word, count in keywords})
 
-                # Display transcript
-                st.markdown("### Full Transcript")
-                st.markdown(
-                    f"""<div class="transcript-viewer">
-                        {result['transcript']}
-                    </div>""",
-                    unsafe_allow_html=True
-                )
+                # Display transcript in an expander
+                with st.expander("Full Transcript"):
+                    st.markdown(
+                        f"""<div class="transcript-viewer">
+                            {result['transcript']}
+                        </div>""",
+                        unsafe_allow_html=True
+                    )
                 
                 # Back button
                 if st.button("← Back to List"):
