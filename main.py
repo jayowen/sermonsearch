@@ -9,8 +9,12 @@ from utils.transcript_processor import TranscriptProcessor
 from utils.youtube_helper import YouTubeHelper
 
 # Initialize components
-db = Database()
-parser = CommandParser()
+try:
+    db = Database()
+    parser = CommandParser()
+except Exception as e:
+    st.error(f"Failed to connect to the database. Please try again later.")
+    st.stop()
 
 def process_video(url: str) -> str:
     """Process a single YouTube video."""
@@ -200,8 +204,13 @@ with st.sidebar:
     with st.expander("ℹ️ Command Help"):
         st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
 
-# Main content
-st.title("YouTube Transcript Processor")
+# Add custom styles and header
+st.markdown("""
+    <div class="header-bar">
+        <h1>YouTube Transcript Processor</h1>
+    </div>
+    <div class="main-content">
+""", unsafe_allow_html=True)
 
 # Command interface
 if st.session_state.current_command == "process-video":
@@ -551,6 +560,8 @@ elif st.session_state.current_command == "time_segments":
                 for i, segment in enumerate(segments, 1):
                     with st.expander(f"Segment {i}"):
                         st.write(segment)
+# Close main-content div
+st.markdown("</div>", unsafe_allow_html=True)
 
 else:
     if not st.session_state.current_command:

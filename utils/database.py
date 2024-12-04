@@ -19,37 +19,57 @@ class Database:
         
         while retry_count < max_retries:
             try:
+                conn_params = {
+                    'connect_timeout': 30,
+                    'keepalives': 1,
+                    'keepalives_idle': 30,
+                    'keepalives_interval': 10,
+                    'keepalives_count': 5,
+                    'options': '-c search_path=public -c client_min_messages=error'
+                }
+                
                 if os.environ.get('DATABASE_URL'):
-                    # Try URL-based connection first
+                    # Parse connection URL and set IPv4 parameters
+                    url = os.environ.get('DATABASE_URL')
+                    try:
+                        # Force IPv4
+                        import socket
+                        socket.setdefaulttimeout(30)
+                        socket.getaddrinfo('neon.tech', 5432, socket.AF_INET)
+                    
+                    print(f"Attempting database connection (attempt {retry_count + 1}/{max_retries})")
+                    # Use psycopg2.connect with retries and IPv4
                     self.conn = psycopg2.connect(
-                        os.environ.get('DATABASE_URL'),
-                        connect_timeout=30,
-                        keepalives=1,
+                        url,
+                        **conn_params,
                         keepalives_idle=30,
                         keepalives_interval=10,
-                        keepalives_count=5
+                        keepalives_count=5,
+                        application_name='youtube_transcript_processor'
                     )
                 else:
-                    # Fallback to parameter-based connection
+                    # Fallback to parameter-based connection with IPv4
                     self.conn = psycopg2.connect(
                         dbname=os.environ.get('PGDATABASE'),
                         user=os.environ.get('PGUSER'),
                         password=os.environ.get('PGPASSWORD'),
                         host=os.environ.get('PGHOST'),
                         port=os.environ.get('PGPORT'),
-                        connect_timeout=30,
-                        options="-c search_path=public",
-                        keepalives=1,
-                        keepalives_idle=30,
-                        keepalives_interval=10,
-                        keepalives_count=5
+                        **conn_params,
+                        application_name='youtube_transcript_processor'
                     )
-                # Test the connection
+                
+                # Set session parameters
                 with self.conn.cursor() as cur:
+                    cur.execute("SET SESSION client_min_messages TO error;")
+                    cur.execute("SET search_path TO public;")
                     cur.execute('SELECT 1')
+                self.conn.commit()
+                print("Database connection established successfully")
                 return
             except Exception as e:
                 last_error = str(e)
+                print(f"Connection attempt {retry_count + 1} failed: {str(e)}")
                 retry_count += 1
                 if retry_count == max_retries:
                     raise Exception(f"Database connection failed after {max_retries} attempts. Last error: {last_error}")
