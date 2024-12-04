@@ -7,23 +7,22 @@ import csv
 
 class Database:
     def __init__(self):
-        self.supabase_url = os.environ.get("SUPABASE_URL", "").strip()
-        self.supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
+        # Get credentials from environment variables
+        self.supabase_url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "").strip()
+        self.supabase_key = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "").strip()
         
         # Validate credentials
         if not self.supabase_url:
-            print("Error: SUPABASE_URL is missing or empty")
-            raise ValueError("Missing SUPABASE_URL")
+            print("Error: NEXT_PUBLIC_SUPABASE_URL is missing or empty")
+            raise ValueError("Missing NEXT_PUBLIC_SUPABASE_URL")
         if not self.supabase_key:
-            print("Error: SUPABASE_KEY is missing or empty")
-            raise ValueError("Missing SUPABASE_KEY")
+            print("Error: NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or empty")
+            raise ValueError("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY")
             
         try:
-            # Ensure URL has proper format
-            if not self.supabase_url.startswith('https://'):
-                self.supabase_url = f'https://{self.supabase_url}'
-            
-            print(f"Initializing Supabase client with URL: {self.supabase_url[:8]}...")
+            # Log connection details (safely)
+            url_prefix = self.supabase_url.split('.')[0] if self.supabase_url else 'None'
+            print(f"Initializing Supabase client with URL prefix: {url_prefix}...")
             self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
             
             # Test connection by trying to fetch one row from transcripts
