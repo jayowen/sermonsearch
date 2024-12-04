@@ -82,6 +82,10 @@ THEOLOGY_CATEGORIES = [
 # Load environment variables from .env file
 load_dotenv()
 
+# Set Supabase environment variables
+os.environ["NEXT_PUBLIC_SUPABASE_URL"] = "https://cnfqqutobbpgrfqxqnxt.supabase.co"
+os.environ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuZnFxdXRvYmJwZ3JmcXhxbnh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMzMjEzNzYsImV4cCI6MjA0ODg5NzM3Nn0.IXKF8ZRhgR5eVdmcxWfw7r33T3DzHZMgr6c-Wsqj4Nc"
+
 # Configure Streamlit page at the very beginning
 st.set_page_config(
     page_title="Sermon Search",
