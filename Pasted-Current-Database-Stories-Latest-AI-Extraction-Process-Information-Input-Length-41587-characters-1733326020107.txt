@@ -1,0 +1,38 @@
+Current Database Stories
+[
+]
+Latest AI Extraction
+Process Information
+Input Length: 41587 characters
+Number of Story Sections: 0
+Stories Found: 2
+Raw AI Response
+Based on the sermon transcript, here are the relevant personal stories and examples that the speaker shared:
+
+{
+"stories": [
+{
+"title": "The Speaker's Experience at the Garden Tomb in Jerusalem",
+"summary": "The speaker visited the Garden Tomb in Jerusalem and was deeply impacted by the physical location of Jesus' crucifixion. He felt God speak to his heart and guide him to understand the significance of the cross in a deeper way.",
+"message": "The crucifixion of Jesus is not just a story, but a real historical event with profound meaning and impact."
+},
+{
+"title": "The Speaker's Struggle with Fear and Control on the Farm",
+"summary": "The speaker shared how he struggled with fear and a need for control after buying a farm with his family. This led him to become angry and lash out at his family, until he confessed his fear, repented, and gave the farm back to God.",
+"message": "Surrendering our fears and idols to God is necessary for experiencing His freedom and grace."
+}
+]
+}
+Parsed Stories
+[
+0:{
+"title":"The Speaker's Experience at the Garden Tomb in Jerusalem"
+"summary":"The speaker visited the Garden Tomb in Jerusalem and was deeply impacted by the physical location of Jesus' crucifixion. He felt God speak to his heart and guide him to understand the significance of the cross in a deeper way."
+"message":"The crucifixion of Jesus is not just a story, but a real historical event with profound meaning and impact."
+}
+1:{
+"title":"The Speaker's Struggle with Fear and Control on the Farm"
+"summary":"The speaker shared how he struggled with fear and a need for control after buying a farm with his family. This led him to become angry and lash out at his family, until he confessed his fear, repented, and gave the farm back to God."
+"message":"Surrendering our fears and idols to God is necessary for experiencing His freedom and grace."
+}
+]

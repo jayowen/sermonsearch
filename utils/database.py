@@ -1,93 +1,45 @@
 from typing import List, Dict, Any, Optional
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+from supabase import create_client, Client
 import json
-import csv
 from io import StringIO
+import csv
 
 class Database:
     def __init__(self):
-        self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        self._create_tables()
-    
-    def _create_tables(self):
-        """Create necessary tables if they don't exist."""
-        with self.conn.cursor() as cur:
-            # Create transcripts table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS transcripts (
-                    id SERIAL PRIMARY KEY,
-                    video_id TEXT UNIQUE NOT NULL,
-                    title TEXT NOT NULL,
-                    transcript TEXT NOT NULL,
-                    ai_summary TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Create transcript categories table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS transcript_categories (
-                    id SERIAL PRIMARY KEY,
-                    video_id TEXT REFERENCES transcripts(video_id),
-                    category_type TEXT NOT NULL,
-                    categories TEXT[] NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Create personal stories table
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS personal_stories (
-                    id SERIAL PRIMARY KEY,
-                    video_id TEXT REFERENCES transcripts(video_id),
-                    title TEXT NOT NULL,
-                    summary TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            self.conn.commit()
+        supabase_url = os.environ.get("SUPABASE_URL")
+        supabase_key = os.environ.get("SUPABASE_KEY")
+        if not supabase_url or not supabase_key:
+            raise ValueError("Missing Supabase credentials")
+        self.supabase: Client = create_client(supabase_url, supabase_key)
 
     def insert_transcript(self, video_id: str, title: str, transcript: str) -> Optional[str]:
         """Insert a new transcript into the database."""
         try:
-            with self.conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO transcripts (video_id, title, transcript)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (video_id) DO UPDATE
-                    SET title = EXCLUDED.title,
-                        transcript = EXCLUDED.transcript,
-                        created_at = CURRENT_TIMESTAMP
-                    RETURNING video_id
-                """, (video_id, title, transcript))
-                self.conn.commit()
-                result = cur.fetchone()
-                return result[0] if result else None
+            result = self.supabase.table('transcripts').upsert({
+                'video_id': video_id,
+                'title': title,
+                'transcript': transcript
+            }).execute()
+            
+            return video_id if result.data else None
         except Exception as e:
             print(f"Error inserting transcript: {str(e)}")
-            self.conn.rollback()
             return None
 
     def get_transcript(self, video_id: str) -> Dict[str, Any]:
         """Get a single transcript by video_id."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM transcripts WHERE video_id = %s", (video_id,))
-            return cur.fetchone()
+        try:
+            result = self.supabase.table('transcripts').select('*').eq('video_id', video_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"Error getting transcript: {str(e)}")
+            return None
 
     def get_categories(self, video_id: str) -> Dict[str, list]:
         """Get categories for a transcript."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
-                SELECT category_type, categories 
-                FROM transcript_categories 
-                WHERE video_id = %s
-            """, (video_id,))
-            result = cur.fetchall()
+        try:
+            result = self.supabase.table('categories').select('*').eq('video_id', video_id).execute()
             
             categories = {
                 'christian_life': [],
@@ -95,127 +47,140 @@ class Database:
                 'theology': []
             }
             
-            for row in result:
-                if row['category_type'] in categories:
-                    categories[row['category_type']] = row['categories']
+            if result.data:
+                data = result.data[0]
+                categories['christian_life'] = data.get('christian_life', [])
+                categories['church_ministry'] = data.get('church_ministry', [])
+                categories['theology'] = data.get('theology', [])
             
+            return categories
+        except Exception as e:
+            print(f"Error getting categories: {str(e)}")
             return categories
 
     def update_categories(self, video_id: str, categories: Dict[str, list]) -> bool:
         """Update categories for a transcript."""
         try:
-            with self.conn.cursor() as cur:
-                # First, remove existing categories
-                cur.execute("DELETE FROM transcript_categories WHERE video_id = %s", (video_id,))
-                
-                # Insert new categories
-                for category_type, category_list in categories.items():
-                    if category_list:  # Only insert if there are categories
-                        cur.execute("""
-                            INSERT INTO transcript_categories (video_id, category_type, categories)
-                            VALUES (%s, %s, %s)
-                        """, (video_id, category_type, category_list))
-                
-                self.conn.commit()
-                return True
+            result = self.supabase.table('categories').upsert({
+                'video_id': video_id,
+                'christian_life': categories.get('christian_life', []),
+                'church_ministry': categories.get('church_ministry', []),
+                'theology': categories.get('theology', [])
+            }).execute()
+            
+            return bool(result.data)
         except Exception as e:
             print(f"Error updating categories: {str(e)}")
-            self.conn.rollback()
             return False
 
     def video_exists(self, video_id: str) -> Optional[Dict[str, Any]]:
         """Check if a video exists and return its details."""
-        with self.conn.cursor() as cur:
-            cur.execute("SELECT id, title FROM transcripts WHERE video_id = %s", (video_id,))
-            return cur.fetchone()
+        try:
+            result = self.supabase.table('transcripts').select('id, title').eq('video_id', video_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"Error checking video existence: {str(e)}")
+            return None
 
     def get_all_transcripts(self) -> List[Dict[str, Any]]:
         """Get all transcripts."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM transcripts ORDER BY created_at DESC")
-            return cur.fetchall()
+        try:
+            result = self.supabase.table('transcripts').select('*').order('created_at.desc').execute()
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"Error getting all transcripts: {str(e)}")
+            return []
 
     def search_transcripts(self, query: str) -> List[Dict[str, Any]]:
         """Search transcripts using full-text search."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
-                SELECT 
-                    video_id,
-                    title,
-                    ts_headline(
-                        transcript,
-                        plainto_tsquery(%s),
-                        'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
-                    ) as highlight
-                FROM transcripts
-                WHERE transcript_tsvector @@ plainto_tsquery(%s)
-                ORDER BY ts_rank(transcript_tsvector, plainto_tsquery(%s)) DESC
-            """, (query, query, query))
-            return cur.fetchall()
+        try:
+            # Using ilike for basic text search - could be enhanced with proper full-text search
+            result = self.supabase.table('transcripts').select('*').ilike('transcript', f'%{query}%').execute()
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"Error searching transcripts: {str(e)}")
+            return []
 
     def export_transcripts(self, format: str = "json") -> str:
         """Export all transcripts in the specified format."""
-        transcripts = self.get_all_transcripts()
-        
-        if format == "json":
-            return json.dumps(transcripts, default=str)
-        elif format == "csv":
-            output = StringIO()
-            if transcripts:
-                writer = csv.DictWriter(output, fieldnames=transcripts[0].keys())
-                writer.writeheader()
-                for t in transcripts:
-                    writer.writerow({k: str(v) for k, v in t.items()})
-            return output.getvalue()
-        else:  # txt format
-            return "\n\n".join([
-                f"Title: {t['title']}\nVideo ID: {t['video_id']}\nTranscript:\n{t['transcript']}"
-                for t in transcripts
-            ])
+        try:
+            transcripts = self.get_all_transcripts()
+            
+            if format == "json":
+                return json.dumps(transcripts, default=str)
+            elif format == "csv":
+                output = StringIO()
+                if transcripts:
+                    writer = csv.DictWriter(output, fieldnames=transcripts[0].keys())
+                    writer.writeheader()
+                    for t in transcripts:
+                        writer.writerow({k: str(v) for k, v in t.items()})
+                return output.getvalue()
+            else:  # txt format
+                return "\n\n".join([
+                    f"Title: {t['title']}\nVideo ID: {t['video_id']}\nTranscript:\n{t['transcript']}"
+                    for t in transcripts
+                ])
+        except Exception as e:
+            print(f"Error exporting transcripts: {str(e)}")
+            return ""
 
     def update_transcript_summary(self, video_id: str, summary: str) -> bool:
         """Update the AI summary for a transcript."""
         try:
-            with self.conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE transcripts 
-                    SET ai_summary = %s 
-                    WHERE video_id = %s
-                """, (summary, video_id))
-                self.conn.commit()
-                return True
+            result = self.supabase.table('transcripts').update({
+                'ai_summary': summary
+            }).eq('video_id', video_id).execute()
+            
+            return bool(result.data)
         except Exception as e:
             print(f"Error updating summary: {str(e)}")
-            self.conn.rollback()
             return False
 
     def get_personal_stories(self, video_id: str) -> List[Dict[str, Any]]:
         """Get personal stories for a transcript."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
-                SELECT * FROM personal_stories 
-                WHERE video_id = %s 
-                ORDER BY created_at DESC
-            """, (video_id,))
-            return cur.fetchall()
+        try:
+            # First get the transcript's stories through the junction table
+            result = self.supabase.table('transcript_stories').select(
+                'stories!inner(*)'
+            ).eq('transcript_id', video_id).execute()
+            
+            return result.data if result.data else []
+        except Exception as e:
+            print(f"Error getting personal stories: {str(e)}")
+            return []
 
     def update_personal_stories(self, video_id: str, stories: List[Dict[str, str]]) -> bool:
         """Update personal stories for a transcript."""
         try:
-            with self.conn.cursor() as cur:
-                # First, remove existing stories
-                cur.execute("DELETE FROM personal_stories WHERE video_id = %s", (video_id,))
+            # First get transcript id
+            transcript = self.get_transcript(video_id)
+            if not transcript:
+                return False
                 
-                # Insert new stories
-                for story in stories:
-                    cur.execute("""
-                        INSERT INTO personal_stories (video_id, title, summary, message)
-                        VALUES (%s, %s, %s, %s)
-                    """, (video_id, story['title'], story['summary'], story['message']))
+            transcript_id = transcript['id']
+            
+            # Begin by removing old relationships
+            self.supabase.table('transcript_stories').delete().eq('transcript_id', transcript_id).execute()
+            
+            # Insert new stories and create relationships
+            for story in stories:
+                # Insert story
+                story_result = self.supabase.table('stories').insert({
+                    'title': story['title'],
+                    'summary': story['summary'],
+                    'message': story['message']
+                }).execute()
                 
-                self.conn.commit()
-                return True
+                if story_result.data:
+                    # Create relationship
+                    story_id = story_result.data[0]['id']
+                    self.supabase.table('transcript_stories').insert({
+                        'transcript_id': transcript_id,
+                        'story_id': story_id
+                    }).execute()
+            
+            return True
         except Exception as e:
             print(f"Error updating personal stories: {str(e)}")
-            self.conn.rollback()
             return False
