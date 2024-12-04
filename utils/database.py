@@ -78,16 +78,17 @@ class Database:
             """)
             self.conn.commit()
 
-    def store_transcript(self, video_id: str, title: str, transcript: str):
-        """Store a transcript in the database."""
+    def store_transcript(self, video_id: str, title: str, transcript: str, ai_summary: str = None):
+        """Store a transcript and its AI summary in the database."""
         with self.conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO transcripts (video_id, title, transcript)
-                VALUES (%s, %s, %s)
+                INSERT INTO transcripts (video_id, title, transcript, ai_summary)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (video_id) DO UPDATE
                 SET transcript = EXCLUDED.transcript,
-                    title = EXCLUDED.title
-            """, (video_id, title, transcript))
+                    title = EXCLUDED.title,
+                    ai_summary = EXCLUDED.ai_summary
+            """, (video_id, title, transcript, ai_summary))
             self.conn.commit()
 
     def export_transcripts(self, format: str = 'json') -> str:

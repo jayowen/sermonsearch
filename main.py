@@ -81,9 +81,15 @@ if st.session_state.current_command == "process":
                 transcript = processor.extract_transcript(video_id)
                 
                 if transcript:
-                    # Store in database
-                    db.store_transcript(video_id, "Video Title", transcript)
-                    st.success("Transcript processed and stored successfully!")
+                    # Generate AI summary
+                    with st.spinner("Generating AI summary..."):
+                        from utils.command_parser import CommandParser
+                        parser = CommandParser()
+                        ai_summary = parser.summarize_text(transcript, max_length=250)
+                    
+                    # Store in database with summary
+                    db.store_transcript(video_id, "Video Title", transcript, ai_summary)
+                    st.success("Transcript processed and AI summary generated successfully!")
                 else:
                     st.error("No transcript available for this video.")
             except Exception as e:
@@ -111,7 +117,9 @@ elif st.session_state.current_command == "playlist":
                 for i, video in enumerate(videos):
                     transcript = processor.extract_transcript(video['video_id'])
                     if transcript:
-                        db.store_transcript(video['video_id'], video['title'], transcript)
+                        # Generate AI summary for each video
+                        ai_summary = parser.summarize_text(transcript, max_length=250)
+                        db.store_transcript(video['video_id'], video['title'], transcript, ai_summary)
                     progress_bar.progress((i + 1) / len(videos))
                 
                 st.success(f"Processed {len(videos)} videos from playlist!")
