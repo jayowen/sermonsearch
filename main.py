@@ -382,18 +382,28 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                         default=current_categories.get('theology', [])
                     )
                 
-                # Add button to save manual changes
-                if st.button("Save Category Changes"):
+                # Create a callback to handle category changes
+                def on_category_change():
                     new_categories = {
                         'christian_life': selected_christian,
                         'church_ministry': selected_ministry,
                         'theology': selected_theology
                     }
                     if db.update_categories(st.session_state.show_transcript_id, new_categories):
-                        st.success("Categories updated successfully!")
+                        st.success("Categories updated automatically!")
                         st.rerun()
                     else:
                         st.error("Failed to update categories")
+
+                # Check if any category has changed
+                if ('prev_christian' not in st.session_state or st.session_state.prev_christian != selected_christian or
+                    'prev_ministry' not in st.session_state or st.session_state.prev_ministry != selected_ministry or
+                    'prev_theology' not in st.session_state or st.session_state.prev_theology != selected_theology):
+                    
+                    st.session_state.prev_christian = selected_christian
+                    st.session_state.prev_ministry = selected_ministry
+                    st.session_state.prev_theology = selected_theology
+                    on_category_change()
                 
                 # Add button to regenerate categories
                 col1, col2 = st.columns(2)
