@@ -15,7 +15,7 @@ from utils.database import Database
 from utils.transcript_processor import TranscriptProcessor
 from utils.youtube_helper import YouTubeHelper
 
-# Basic styling for consistency
+# Header and basic styling
 st.markdown("""
     <style>
     .stApp {
@@ -24,16 +24,26 @@ st.markdown("""
     .stDeployButton {
         display: none !important;
     }
+    .header-container {
+        background: linear-gradient(to right, #0E1117, #262730);
+        padding: 1.5rem;
+        margin: -1rem -1rem 2rem -1rem;
+        border-bottom: 3px solid #00ff00;
+        box-shadow: 0 2px 4px rgba(0,255,0,0.1);
+    }
+    .header-title {
+        text-align: center;
+        color: #00ff00;
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-shadow: 0 0 10px rgba(0,255,0,0.3);
+        margin: 0;
+    }
     </style>
+    <div class="header-container">
+        <h1 class="header-title">YouTube Transcript Processor</h1>
+    </div>
 """, unsafe_allow_html=True)
-
-# Simple header with consistent styling
-st.markdown(
-    "<h1 style='text-align: center; color: #00ff00; padding: 1rem 0; border-bottom: 2px solid #00ff00;'>"
-    "YouTube Transcript Processor"
-    "</h1>",
-    unsafe_allow_html=True
-)
 
 # Initialize database connection
 def init_database():
@@ -102,8 +112,6 @@ if 'show_transcript_id' not in st.session_state:
     st.session_state.show_transcript_id = None
 if 'current_command' not in st.session_state:
     st.session_state.current_command = None
-
-st.title("YouTube Transcript Processor")
 
 # Load custom CSS
 try:
