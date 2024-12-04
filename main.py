@@ -85,7 +85,7 @@ if st.session_state.current_command == "process":
                         if st.button("View Existing"):
                             st.session_state.show_transcript_id = video_id
                             st.session_state.current_command = "view_video"
-                            st.rerun()
+                            st.experimental_rerun()
                     with col2:
                         if st.button("Re-process"):
                             try:
