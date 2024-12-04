@@ -138,24 +138,26 @@ Here's the transcript to analyze:
                 text = text[:max_chars] + "..."
 
             # Create prompt for story extraction
-            prompt = """Please analyze this sermon transcript and extract personal stories or anecdotes shared by the speaker. For each story found, provide:
-1. A brief title
-2. A concise summary of the story
-3. The key message or lesson from the story
+            prompt = """Does this sermon include any personal stories, anecdotes, or examples shared by the speaker to illustrate the message? For each story or example found, please provide:
 
-Format your response as a JSON array of story objects, each with 'title', 'summary', and 'message' fields.
-Example format:
+1. A brief title for the story/example
+2. A concise summary of what happened
+3. The key message or lesson the speaker was illustrating
+
+Format your response strictly as a JSON object with a 'stories' array containing objects with 'title', 'summary', and 'message' fields. Example:
 {
     "stories": [
         {
             "title": "The Lost Sheep",
-            "summary": "A shepherd left his 99 sheep to find one that was lost",
+            "summary": "A shepherd left his 99 sheep to find one that was lost in the mountains",
             "message": "God's love for each individual is personal and pursuing"
         }
     ]
 }
 
-Here's the transcript to analyze:
+Only include actual personal stories or specific examples, not general teachings or biblical passages unless they're part of a personal anecdote.
+
+Here's the sermon transcript to analyze:
 
 """ + text
 
