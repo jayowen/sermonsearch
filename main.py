@@ -436,7 +436,7 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                 col1, col2 = st.columns(2)
                 with col1:
                     if categories:
-                        if st.button("Regenerate Categories"):
+                        if st.button("🤖 Generate Categories with AI"):
                             with st.spinner("Analyzing transcript and generating categories..."):
                                 try:
                                     ai_response = ai_helper.categorize_transcript(result['transcript'])
@@ -464,7 +464,7 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                                         'errors': [str(e)]
                                     }
                     else:
-                        if st.button("Generate Categories"):
+                        if st.button("🤖 Generate Categories with AI"):
                             with st.spinner("Analyzing transcript and generating categories..."):
                                 try:
                                     ai_response = ai_helper.categorize_transcript(result['transcript'])
