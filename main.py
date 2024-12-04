@@ -366,17 +366,25 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                     if categories:
                         if st.button("Regenerate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
-                                categories = ai_helper.categorize_transcript(result['transcript'])
-                                db.update_categories(st.session_state.show_transcript_id, categories)
-                                st.success("Categories regenerated successfully!")
-                                st.rerun()
+                                new_categories = ai_helper.categorize_transcript(result['transcript'])
+                                if db.update_categories(st.session_state.show_transcript_id, new_categories):
+                                    # Fetch the updated categories
+                                    categories = db.get_categories(st.session_state.show_transcript_id)
+                                    st.success("Categories regenerated successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update categories")
                     else:
                         if st.button("Generate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
-                                categories = ai_helper.categorize_transcript(result['transcript'])
-                                db.update_categories(st.session_state.show_transcript_id, categories)
-                                st.success("Categories generated successfully!")
-                                st.rerun()
+                                new_categories = ai_helper.categorize_transcript(result['transcript'])
+                                if db.update_categories(st.session_state.show_transcript_id, new_categories):
+                                    # Fetch the updated categories
+                                    categories = db.get_categories(st.session_state.show_transcript_id)
+                                    st.success("Categories generated successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update categories")
             
             with stories_tab:
                 st.markdown("### Personal Stories")
