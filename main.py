@@ -15,7 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-
 # Initialize database connection
 db = Database()
 youtube = YouTubeHelper()
@@ -27,7 +26,6 @@ if 'current_command' not in st.session_state:
     st.session_state.current_command = None
 if 'show_transcript_id' not in st.session_state:
     st.session_state.show_transcript_id = None
-
 
 # Load and apply custom CSS
 try:
@@ -68,7 +66,6 @@ with st.sidebar:
     with st.expander("ℹ️ Command Help"):
         st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
 
-
 # Main content area
 if st.session_state.current_command == "process":
     st.subheader("Process Single Video")
@@ -92,20 +89,20 @@ if st.session_state.current_command == "process":
                     with col2:
                         if st.button("Re-process"):
                             try:
+                                # Process existing video
                                 transcript = processor.extract_transcript(video_id)
                                 if not transcript:
                                     st.error("No transcript available for this video.")
                                     st.stop()
-                                    
+                                
                                 # Generate AI summary
                                 with st.spinner("Generating AI summary..."):
-                                    from utils.command_parser import CommandParser
-                                    parser = CommandParser()
                                     ai_summary = parser.summarize_text(transcript, max_length=250)
                                 
                                 # Store in database with summary
                                 db.store_transcript(video_id, existing_video['title'], transcript, ai_summary)
                                 st.success("Transcript re-processed successfully!")
+                                
                                 # Redirect to video view
                                 st.session_state.show_transcript_id = video_id
                                 st.session_state.current_command = "view_video"
@@ -113,17 +110,17 @@ if st.session_state.current_command == "process":
                             except Exception as e:
                                 st.error(f"Error re-processing video: {str(e)}")
                                 st.stop()
-                else:
+                    st.stop()  # Stop here if video exists to prevent further processing
+                
+                # Process new video if it doesn't exist
+                try:
                     transcript = processor.extract_transcript(video_id)
                     if not transcript:
                         st.error("No transcript available for this video.")
                         st.stop()
-                
-                if transcript:
+                    
                     # Generate AI summary
                     with st.spinner("Generating AI summary..."):
-                        from utils.command_parser import CommandParser
-                        parser = CommandParser()
                         ai_summary = parser.summarize_text(transcript, max_length=250)
                     
                     # Get video title from YouTube API
@@ -137,12 +134,15 @@ if st.session_state.current_command == "process":
                     # Store in database with summary
                     db.store_transcript(video_id, video_title, transcript, ai_summary)
                     st.success("Transcript processed successfully!")
+                    
                     # Redirect to video view
                     st.session_state.show_transcript_id = video_id
                     st.session_state.current_command = "view_video"
                     st.rerun()
+                except Exception as e:
+                    st.error(f"Error processing video: {str(e)}")
             except Exception as e:
-                st.error(f"Error processing video: {str(e)}")
+                st.error(f"Error extracting video ID: {str(e)}")
         else:
             st.warning("Please enter a valid YouTube URL")
 
