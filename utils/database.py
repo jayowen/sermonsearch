@@ -1,173 +1,77 @@
+from typing import List, Dict, Any, Optional
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from typing import List, Dict, Any
-import time
+import json
+import csv
+from io import StringIO
 
 class Database:
     def __init__(self):
-        """Initialize database connection with retry logic"""
-        self.conn = None
-        try:
-            self._connect()
-            self.setup_database()
-        except Exception as e:
-            print(f"Database initialization error: {str(e)}")
-            raise
-        
-    def _connect(self):
-        """Establish database connection with robust error handling"""
-        max_retries = 3
-        retry_delay = 2
-        
-        for attempt in range(max_retries):
-            try:
-                # Basic connection parameters
-                conn_params = {
-                    'application_name': 'youtube_transcript_processor',
-                    'connect_timeout': 10,
-                    'keepalives': 1,
-                    'keepalives_idle': 30,
-                    'keepalives_interval': 10,
-                    'keepalives_count': 5
-                }
-                
-                # Get database URL from environment
-                database_url = os.environ.get('DATABASE_URL')
-                if not database_url:
-                    raise ValueError("DATABASE_URL environment variable is not set")
-                
-                # Establish connection using the database URL
-                self.conn = psycopg2.connect(database_url, **conn_params)
-                
-                # Set session parameters
-                with self.conn.cursor() as cur:
-                    cur.execute("SET SESSION client_min_messages TO error;")
-                    cur.execute("SET search_path TO public;")
-                    cur.execute('SELECT 1')
-                self.conn.commit()
-                print("Database connection established successfully")
-                return
-                
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    print(f"Connection attempt {attempt + 1} failed: {str(e)}")
-                    time.sleep(retry_delay)
-                else:
-                    print(f"All connection attempts failed. Last error: {str(e)}")
-                    raise
-
-    def setup_database(self):
+        self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        self._create_tables()
+    
+    def _create_tables(self):
         """Create necessary tables if they don't exist."""
         with self.conn.cursor() as cur:
+            # Create transcripts table
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS transcripts (
                     id SERIAL PRIMARY KEY,
-                    video_id VARCHAR(20) UNIQUE NOT NULL,
+                    video_id TEXT UNIQUE NOT NULL,
                     title TEXT NOT NULL,
                     transcript TEXT NOT NULL,
                     ai_summary TEXT,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                );
-                
-                -- Add ai_summary column if it doesn't exist
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns 
-                        WHERE table_name = 'transcripts' AND column_name = 'ai_summary'
-                    ) THEN
-                        ALTER TABLE transcripts ADD COLUMN ai_summary TEXT;
-                    END IF;
-                END $$;
-                
-                CREATE INDEX IF NOT EXISTS idx_transcript_search 
-                ON transcripts USING gin(to_tsvector('english', transcript));
+                )
             """)
+            
+            # Create transcript categories table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS transcript_categories (
+                    id SERIAL PRIMARY KEY,
+                    video_id TEXT REFERENCES transcripts(video_id),
+                    category_type TEXT NOT NULL,
+                    categories TEXT[] NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Create personal stories table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS personal_stories (
+                    id SERIAL PRIMARY KEY,
+                    video_id TEXT REFERENCES transcripts(video_id),
+                    title TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
             self.conn.commit()
 
-    def store_transcript(self, video_id: str, title: str, transcript: str, ai_summary: str = None) -> None:
-        """Store a transcript and its AI summary in the database."""
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO transcripts (video_id, title, transcript, ai_summary)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (video_id) DO UPDATE
-                SET transcript = EXCLUDED.transcript,
-                    title = EXCLUDED.title,
-                    ai_summary = EXCLUDED.ai_summary;
-            """, (video_id, title, transcript, ai_summary))
-            self.conn.commit()
-
-    def export_transcripts(self, format: str = 'json') -> str:
-        """Export all transcripts in the specified format (json, csv, or txt)."""
-        transcripts = self.get_all_transcripts()
-        if not transcripts:
-            return ""
-            
-        if format == 'json':
-            import json
-            return json.dumps([{
-                'video_id': t['video_id'],
-                'title': t['title'],
-                'transcript': t['transcript'],
-                'created_at': t['created_at'].isoformat()
-            } for t in transcripts], indent=2)
-            
-        elif format == 'csv':
-            import csv
-            import io
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow(['video_id', 'title', 'transcript', 'created_at'])
-            for t in transcripts:
-                writer.writerow([
-                    t['video_id'],
-                    t['title'],
-                    t['transcript'],
-                    t['created_at'].isoformat()
-                ])
-            return output.getvalue()
-            
-        elif format == 'txt':
-            lines = []
-            for t in transcripts:
-                lines.extend([
-                    f"Title: {t['title']}",
-                    f"Video ID: {t['video_id']}",
-                    f"Created: {t['created_at'].isoformat()}",
-                    "Transcript:",
-                    t['transcript'],
-                    "-" * 80,
-                    ""
-                ])
-            return "\n".join(lines)
-            
-        else:
-            raise ValueError(f"Unsupported export format: {format}")
-
-    def search_transcripts(self, query: str) -> List[Dict[str, Any]]:
-        """Search transcripts using full-text search."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""
-                SELECT id, video_id, title, transcript,
-                       ts_headline('english', transcript, plainto_tsquery(%s)) as highlight
-                FROM transcripts
-                WHERE to_tsvector('english', transcript) @@ plainto_tsquery(%s)
-                ORDER BY ts_rank(to_tsvector('english', transcript), plainto_tsquery(%s)) DESC
-            """, (query, query, query))
-            return cur.fetchall()
-
-    def get_all_transcripts(self) -> List[Dict[str, Any]]:
-        """Retrieve all stored transcripts."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT * FROM transcripts ORDER BY created_at DESC")
-            return cur.fetchall()
-    def video_exists(self, video_id: str) -> Dict[str, Any]:
-        """Check if a video exists in the database and return its info if it does."""
-        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id, title FROM transcripts WHERE video_id = %s", (video_id,))
-            return cur.fetchone()
+    def insert_transcript(self, video_id: str, title: str, transcript: str) -> Optional[str]:
+        """Insert a new transcript into the database."""
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO transcripts (video_id, title, transcript)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (video_id) DO UPDATE
+                    SET title = EXCLUDED.title,
+                        transcript = EXCLUDED.transcript,
+                        created_at = CURRENT_TIMESTAMP
+                    RETURNING video_id
+                """, (video_id, title, transcript))
+                self.conn.commit()
+                result = cur.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            print(f"Error inserting transcript: {str(e)}")
+            self.conn.rollback()
+            return None
 
     def get_transcript(self, video_id: str) -> Dict[str, Any]:
         """Get a single transcript by video_id."""
@@ -175,3 +79,143 @@ class Database:
             cur.execute("SELECT * FROM transcripts WHERE video_id = %s", (video_id,))
             return cur.fetchone()
 
+    def get_categories(self, video_id: str) -> Dict[str, list]:
+        """Get categories for a transcript."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT category_type, categories 
+                FROM transcript_categories 
+                WHERE video_id = %s
+            """, (video_id,))
+            result = cur.fetchall()
+            
+            categories = {
+                'christian_life': [],
+                'church_ministry': [],
+                'theology': []
+            }
+            
+            for row in result:
+                if row['category_type'] in categories:
+                    categories[row['category_type']] = row['categories']
+            
+            return categories
+
+    def update_categories(self, video_id: str, categories: Dict[str, list]) -> bool:
+        """Update categories for a transcript."""
+        try:
+            with self.conn.cursor() as cur:
+                # First, remove existing categories
+                cur.execute("DELETE FROM transcript_categories WHERE video_id = %s", (video_id,))
+                
+                # Insert new categories
+                for category_type, category_list in categories.items():
+                    if category_list:  # Only insert if there are categories
+                        cur.execute("""
+                            INSERT INTO transcript_categories (video_id, category_type, categories)
+                            VALUES (%s, %s, %s)
+                        """, (video_id, category_type, category_list))
+                
+                self.conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error updating categories: {str(e)}")
+            self.conn.rollback()
+            return False
+
+    def video_exists(self, video_id: str) -> Optional[Dict[str, Any]]:
+        """Check if a video exists and return its details."""
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT id, title FROM transcripts WHERE video_id = %s", (video_id,))
+            return cur.fetchone()
+
+    def get_all_transcripts(self) -> List[Dict[str, Any]]:
+        """Get all transcripts."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT * FROM transcripts ORDER BY created_at DESC")
+            return cur.fetchall()
+
+    def search_transcripts(self, query: str) -> List[Dict[str, Any]]:
+        """Search transcripts using full-text search."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    video_id,
+                    title,
+                    ts_headline(
+                        transcript,
+                        plainto_tsquery(%s),
+                        'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
+                    ) as highlight
+                FROM transcripts
+                WHERE transcript_tsvector @@ plainto_tsquery(%s)
+                ORDER BY ts_rank(transcript_tsvector, plainto_tsquery(%s)) DESC
+            """, (query, query, query))
+            return cur.fetchall()
+
+    def export_transcripts(self, format: str = "json") -> str:
+        """Export all transcripts in the specified format."""
+        transcripts = self.get_all_transcripts()
+        
+        if format == "json":
+            return json.dumps(transcripts, default=str)
+        elif format == "csv":
+            output = StringIO()
+            if transcripts:
+                writer = csv.DictWriter(output, fieldnames=transcripts[0].keys())
+                writer.writeheader()
+                for t in transcripts:
+                    writer.writerow({k: str(v) for k, v in t.items()})
+            return output.getvalue()
+        else:  # txt format
+            return "\n\n".join([
+                f"Title: {t['title']}\nVideo ID: {t['video_id']}\nTranscript:\n{t['transcript']}"
+                for t in transcripts
+            ])
+
+    def update_transcript_summary(self, video_id: str, summary: str) -> bool:
+        """Update the AI summary for a transcript."""
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE transcripts 
+                    SET ai_summary = %s 
+                    WHERE video_id = %s
+                """, (summary, video_id))
+                self.conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error updating summary: {str(e)}")
+            self.conn.rollback()
+            return False
+
+    def get_personal_stories(self, video_id: str) -> List[Dict[str, Any]]:
+        """Get personal stories for a transcript."""
+        with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT * FROM personal_stories 
+                WHERE video_id = %s 
+                ORDER BY created_at DESC
+            """, (video_id,))
+            return cur.fetchall()
+
+    def update_personal_stories(self, video_id: str, stories: List[Dict[str, str]]) -> bool:
+        """Update personal stories for a transcript."""
+        try:
+            with self.conn.cursor() as cur:
+                # First, remove existing stories
+                cur.execute("DELETE FROM personal_stories WHERE video_id = %s", (video_id,))
+                
+                # Insert new stories
+                for story in stories:
+                    cur.execute("""
+                        INSERT INTO personal_stories (video_id, title, summary, message)
+                        VALUES (%s, %s, %s, %s)
+                    """, (video_id, story['title'], story['summary'], story['message']))
+                
+                self.conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error updating personal stories: {str(e)}")
+            self.conn.rollback()
+            return False
