@@ -1,16 +1,90 @@
 import streamlit as st
 import os
+from dotenv import load_dotenv
 from utils.database import Database
 from psycopg2.extras import RealDictCursor
 from utils.youtube_helper import YouTubeHelper
 from utils.transcript_processor import TranscriptProcessor
 from utils.command_parser import CommandParser
+from utils.ai_helper import AIHelper  # Import AIHelper
 from typing import Dict, Any
 import json
 
+def process_single_video(video_id: str, title: str = None, no_redirect: bool = False) -> None:
+    """Process a single video: download transcript and store in database."""
+    try:
+        transcript = processor.extract_transcript(video_id)
+        if not transcript:
+            st.error("No transcript available for this video.")
+            st.stop()
+        
+        # Generate AI summary
+        with st.spinner("Generating AI summary..."):
+            summary = ai_helper.generate_summary(transcript)
+        
+        # Generate categories
+        with st.spinner("Analyzing transcript and generating categories..."):
+            categories = ai_helper.categorize_transcript(transcript)
+        
+        # If no title provided, get it from YouTube
+        if not title:
+            video_info = youtube.get_video_info(video_id)
+            title = video_info['title']
+        
+        # Insert transcript and get the ID
+        transcript_id = db.insert_transcript(video_id, title, transcript)
+        if transcript_id:
+            # Update categories
+            db.update_categories(transcript_id, categories)
+            st.success("Transcript processed and categorized successfully!")
+            
+            # Only update state and redirect if not processing a playlist
+            if not no_redirect:
+                st.session_state.show_transcript_id = transcript_id
+                st.session_state.current_command = "view_video"
+                st.rerun()
+        else:
+            st.error("Failed to store transcript in database.")
+            st.stop()
+    except Exception as e:
+        st.error(f"Error processing video: {str(e)}")
+        st.stop()
+
+# Initialize category lists
+CHRISTIAN_LIFE_CATEGORIES = [
+    "Abortion", "Abuse", "Adoption", "Anger", "Anxiety", "Community", "Current Events", 
+    "Dating", "Death", "Discipline", "Divorce", "Education", "Fatherhood", "Fear", 
+    "Finances", "Forgiveness", "Gender", "Holiness", "Hypocrisy", "Identity", "Idolatry", 
+    "Joy", "Marriage", "Motherhood", "Peace", "Politics", "Pride", "Purity", "Race", 
+    "Relationships", "Rest", "Sexuality", "Singleness", "Suffering", "Suicide", 
+    "Technology", "Wisdom", "Work"
+]
+
+CHURCH_MINISTRY_CATEGORIES = [
+    "Adults", "Baptism", "Care", "Church", "Church Planting", "Church-Planting", 
+    "Connections", "Disciple Groups", "Discipleship", "Faith", "Family Discipleship", 
+    "Fasting", "Giving", "Global Missions", "Grace", "Kids", "Leadership", 
+    "Local Missions", "Men", "Missional Living", "Missions", "Multisite", "Persecution", 
+    "Prayer", "School of Ministry", "Serving", "Students", "The Church of Eleven22", 
+    "Women", "World Religions", "Worship"
+]
+
+THEOLOGY_CATEGORIES = [
+    "Creation", "End Times", "False Teaching", "Heaven and Hell", "Revelation", 
+    "Salvation", "Sanctification", "Sin", "Sound Doctrine", "Spiritual Gifts", 
+    "Spiritual Warfare", "The Bible", "The Birth of Christ", "The Character of God", 
+    "The Death of Christ", "The Fall", "The Gathering", "The Gospel", "The Holy Spirit", 
+    "The Kingdom of God", "The Law", "The Lord's Supper", "The Ministry of Christ", 
+    "The Resurrection of Christ", "The Return of Christ", "The Sovereignty of God", 
+    "Theology", "Trinitarianism", "Union with Christ"
+]
+
+# Load environment variables from .env file
+load_dotenv()
+
 # Configure Streamlit page at the very beginning
 st.set_page_config(
-    page_title="YouTube Transcript Processor",
+    page_title="Sermon Search",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -20,6 +94,7 @@ db = Database()
 youtube = YouTubeHelper()
 processor = TranscriptProcessor()
 parser = CommandParser()
+ai_helper = AIHelper()  # Create an AIHelper instance
 
 # Initialize session state
 if 'current_command' not in st.session_state:
@@ -39,13 +114,11 @@ st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 # Sidebar navigation
 with st.sidebar:
-    st.title("YouTube Transcript Processor")
+    st.title("Sermon Search")
     st.markdown("---")
     
-    if st.button("🎥 Process Single Video", use_container_width=True):
-        st.session_state.current_command = "process"
-    if st.button("📑 Process Playlist", use_container_width=True):
-        st.session_state.current_command = "playlist"
+    if st.button("➕ Add Video(s)", use_container_width=True):
+        st.session_state.current_command = "add_videos"
     if st.button("🔍 Search Transcripts", use_container_width=True):
         st.session_state.current_command = "search"
     if st.button("📋 List All Transcripts", use_container_width=True):
@@ -58,8 +131,6 @@ with st.sidebar:
         st.session_state.current_command = "frequency"
     if st.button("🔑 Key Phrases", use_container_width=True):
         st.session_state.current_command = "phrases"
-    if st.button("⏱️ Time Segments", use_container_width=True):
-        st.session_state.current_command = "segments"
     if st.button("💾 Export Data", use_container_width=True):
         st.session_state.current_command = "export"
     st.markdown("---")
@@ -67,144 +138,114 @@ with st.sidebar:
         st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
 
 # Main content area
-if st.session_state.current_command == "process":
-    st.subheader("Process Single Video")
-    url = st.text_input("Enter YouTube Video URL")
+if st.session_state.current_command == "add_videos":
+    st.subheader("Add Video(s)")
     
-    if st.button("Process Video"):
+    # Radio button to select input type
+    input_type = st.radio("Select input type:", ["Single Video", "Playlist"])
+    url = st.text_input("Enter YouTube URL", help="Enter a video URL or playlist URL")
+    
+    if input_type == "Playlist":
+        batch_size = st.slider("Batch Size", min_value=1, max_value=10, value=5, 
+                             help="Number of videos to process in each batch")
+    
+    if st.button("Process", key="process_videos_btn"):
         if url:
             try:
-                video_id = processor.extract_video_id(url)
-                
-                # Check if video already exists
-                existing_video = db.video_exists(video_id)
-                if existing_video:
-                    st.info(f"This video '{existing_video['title']}' is already in the system.")
+                if input_type == "Single Video":
+                    # Process single video
+                    video_id = processor.extract_video_id(url)
                     
-                    # Create unique keys for buttons
-                    view_key = f"view_{video_id}"
-                    reprocess_key = f"reprocess_{video_id}"
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("View Existing", key=view_key):
-                            st.session_state.show_transcript_id = video_id
-                            st.session_state.current_command = "view_video"
-                            st.experimental_rerun()
+                    # Check if video already exists
+                    existing_video = db.video_exists(video_id)
+                    if existing_video:
+                        st.info(f"This video '{existing_video['title']}' is already in the system.")
+                        
+                        # Initialize session state for action selection
+                        if 'video_action' not in st.session_state:
+                            st.session_state.video_action = None
                             
-                    with col2:
-                        if st.button("Re-process", key=reprocess_key):
-                            try:
-                                with st.spinner("Processing video..."):
-                                    # Process existing video
-                                    transcript = processor.extract_transcript(video_id)
-                                    if not transcript:
-                                        st.error("No transcript available for this video.")
-                                        st.stop()
-                                    
-                                    # Generate AI summary
-                                    with st.spinner("Generating AI summary..."):
-                                        ai_summary = parser.summarize_text(transcript, max_length=250)
-                                    
-                                    # Store in database with summary
-                                    db.store_transcript(video_id, existing_video['title'], transcript, ai_summary)
-                                    st.success("Transcript re-processed successfully!")
-                                    
-                                    # Update state and redirect
+                        # Create a form for action selection
+                        with st.form(key=f'video_action_form_{video_id}'):
+                            action = st.radio(
+                                "Choose an action:",
+                                ["View Existing", "Re-process"],
+                                key=f'action_radio_{video_id}'
+                            )
+                            
+                            submitted = st.form_submit_button("Confirm Action")
+                            if submitted:
+                                if action == "View Existing":
                                     st.session_state.show_transcript_id = video_id
                                     st.session_state.current_command = "view_video"
-                                    st.experimental_rerun()
-                            except Exception as e:
-                                st.error(f"Error re-processing video: {str(e)}")
-                                st.stop()
-                    st.stop()  # Stop here if video exists to prevent further processing
+                                    st.rerun()
+                                else:  # Re-process
+                                    process_single_video(video_id, existing_video['title'])
+                    else:
+                        process_single_video(video_id)
                 
-                # Process new video if it doesn't exist
-                try:
-                    transcript = processor.extract_transcript(video_id)
-                    if not transcript:
-                        st.error("No transcript available for this video.")
-                        st.stop()
+                else:  # Playlist processing
+                    st.markdown("""
+                    ### Processing Playlist
+                    The videos will be processed in batches to handle large playlists efficiently.
+                    You can monitor the progress below:
+                    """)
                     
-                    # Generate AI summary
-                    with st.spinner("Generating AI summary..."):
-                        ai_summary = parser.summarize_text(transcript, max_length=250)
-                    
-                    # Get video title from YouTube API
+                    # Get videos from playlist using the youtube helper instance
                     try:
-                        video_info = youtube.get_video_info(video_id)
-                        video_title = video_info['title']
+                        videos = youtube.get_playlist_videos(url)
+                        st.info(f"Found {len(videos)} videos in playlist")
+                        
+                        # Check for existing videos
+                        existing_videos = []
+                        new_videos = []
+                        for video in videos:
+                            if db.video_exists(video['video_id']):
+                                existing_videos.append(video)
+                            else:
+                                new_videos.append(video)
+                        
+                        if existing_videos:
+                            st.info(f"Found {len(existing_videos)} videos that are already in the system.")
+                            if st.button("Re-process existing videos", key="reprocess_playlist"):
+                                new_videos.extend(existing_videos)
+                            else:
+                                st.write("Will only process new videos.")
+                        
+                        if new_videos:
+                            progress_bar = st.progress(0)
+                            processed_count = 0
+                            errors = []
+                            
+                            for i, video in enumerate(new_videos):
+                                try:
+                                    with st.spinner(f"Processing video {i+1} of {len(new_videos)}: {video['title']}"):
+                                        process_single_video(video['video_id'], video['title'], no_redirect=True)
+                                        processed_count += 1
+                                except Exception as e:
+                                    errors.append(f"Error processing {video['title']}: {str(e)}")
+                                progress_bar.progress((i + 1) / len(new_videos))
+                            
+                            # Show summary
+                            if processed_count > 0:
+                                st.success(f"Successfully processed {processed_count} videos!")
+                            if errors:
+                                st.error("Some videos failed to process:")
+                                for error in errors:
+                                    st.error(error)
+                            
+                            # Add a button to view all videos
+                            if st.button("View All Videos", key="view_all_videos"):
+                                st.session_state.current_command = "list"
+                                st.rerun()
+                        else:
+                            st.info("No new videos to process.")
                     except Exception as e:
-                        video_title = f"Video {video_id}"
-                        st.warning(f"Could not fetch video title: {str(e)}")
-                    
-                    # Store in database with summary
-                    db.store_transcript(video_id, video_title, transcript, ai_summary)
-                    st.success("Transcript processed successfully!")
-                    
-                    # Redirect to video view
-                    st.session_state.show_transcript_id = video_id
-                    st.session_state.current_command = "view_video"
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error processing video: {str(e)}")
+                        st.error(f"Error processing playlist: {str(e)}")
             except Exception as e:
-                st.error(f"Error extracting video ID: {str(e)}")
+                st.error(f"Error processing videos: {str(e)}")
         else:
             st.warning("Please enter a valid YouTube URL")
-
-elif st.session_state.current_command == "playlist":
-    st.subheader("Process Playlist")
-    url = st.text_input("Enter YouTube Playlist URL")
-    batch_size = st.slider("Batch Size", min_value=1, max_value=10, value=5, 
-                          help="Number of videos to process in each batch")
-    
-    if st.button("Process", key="process_playlist_btn"):
-        if url:
-            st.markdown("""
-            ### Processing Playlist
-            The videos will be processed in batches to handle large playlists efficiently.
-            You can monitor the progress below:
-            """)
-            try:
-                videos = youtube.get_playlist_videos(url)
-                
-                # Check for existing videos first
-                existing_videos = []
-                new_videos = []
-                for video in videos:
-                    if db.video_exists(video['video_id']):
-                        existing_videos.append(video)
-                    else:
-                        new_videos.append(video)
-                
-                if existing_videos:
-                    st.info(f"Found {len(existing_videos)} videos that are already in the system.")
-                    if st.button("Re-process all"):
-                        new_videos.extend(existing_videos)
-                    else:
-                        st.write("Will only process new videos.")
-                
-                if new_videos:
-                    progress_bar = st.progress(0)
-                    processed_count = 0
-                    
-                    for i, video in enumerate(new_videos):
-                        transcript = processor.extract_transcript(video['video_id'])
-                        if transcript:
-                            # Generate AI summary for each video
-                            ai_summary = parser.summarize_text(transcript, max_length=250)
-                            db.store_transcript(video['video_id'], video['title'], transcript, ai_summary)
-                            processed_count += 1
-                        progress_bar.progress((i + 1) / len(new_videos))
-                    
-                    st.success(f"Processed {processed_count} videos from playlist!")
-                else:
-                    st.info("No new videos to process.")
-            except Exception as e:
-                st.error(f"Error processing playlist: {str(e)}")
-        else:
-            st.warning("Please enter a valid playlist URL")
 
 elif st.session_state.current_command == "search":
     st.subheader("Search Transcripts")
@@ -237,7 +278,7 @@ elif st.session_state.current_command == "list":
                         </div>
                         <div class="video-info">
                             <h3>{t['title']}</h3>
-                            <p>Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}</p>
+                            <p>Added: {t['created_at'].split('.')[0].replace('T', ' ')}</p>
                         </div>
                         </div>""",
                     unsafe_allow_html=True
@@ -252,35 +293,156 @@ elif st.session_state.current_command == "list":
 elif st.session_state.current_command == "view_video" and st.session_state.show_transcript_id:
     with st.spinner("Loading video and transcript..."):
         # Get video details
-        with db.conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT title, transcript, ai_summary FROM transcripts WHERE video_id = %s", 
-                       (st.session_state.show_transcript_id,))
-            result = cur.fetchone()
+        result = db.get_transcript(st.session_state.show_transcript_id)
+        
+        if result:
+            # Display video title
+            st.title(result['title'])
             
-            if result:
-                # Display video title
-                st.title(result['title'])
+            # Embed YouTube video
+            st.video(f"https://www.youtube.com/watch?v={result['video_id']}")
+            
+            # Create tabs for different sections
+            transcript_tab, categories_tab, stories_tab, edit_tab = st.tabs([
+                "📝 Transcript", 
+                "🏷️ Categories",
+                "📖 Personal Stories",
+                "✏️ Edit"
+            ])
+            
+            # Get categories
+            categories = db.get_categories(st.session_state.show_transcript_id)
+            
+            with transcript_tab:
+                st.markdown("### Full Transcript")
+                st.markdown(result['transcript'])
                 
-                # Embed YouTube video
-                video_url = f"https://www.youtube.com/embed/{st.session_state.show_transcript_id}"
-                st.markdown(
-                    f"""
-                    <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; margin-bottom: 20px;">
-                        <iframe 
-                            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
-                            src="{video_url}"
-                            frameborder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowfullscreen
-                        ></iframe>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-                
-                # Display AI Summary if available
                 if result.get('ai_summary'):
-                    st.markdown("### AI Summary")
+                    with st.expander("View AI Summary"):
+                        st.markdown(result['ai_summary'])
+                else:
+                    if st.button("Generate AI Summary", key="transcript_summary_btn"):
+                        with st.spinner("Generating summary..."):
+                            summary = ai_helper.generate_summary(result['transcript'])
+                            if summary:
+                                # Update transcript with summary
+                                db.update_transcript_summary(st.session_state.show_transcript_id, summary)
+                                st.success("Summary generated successfully!")
+                                st.rerun()
+            
+            with categories_tab:
+                st.markdown("### Categories")
+                
+                # Display current categories
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.markdown("**The Christian Life**")
+                    if categories.get('christian_life'):
+                        for cat in categories['christian_life']:
+                            st.markdown(f"- {cat}")
+                    else:
+                        st.info("No categories selected")
+                
+                with col2:
+                    st.markdown("**Church & Ministry**")
+                    if categories.get('church_ministry'):
+                        for cat in categories['church_ministry']:
+                            st.markdown(f"- {cat}")
+                    else:
+                        st.info("No categories selected")
+                
+                with col3:
+                    st.markdown("**Theology**")
+                    if categories.get('theology'):
+                        for cat in categories['theology']:
+                            st.markdown(f"- {cat}")
+                    else:
+                        st.info("No categories selected")
+                
+                # Add button to regenerate categories
+                col1, col2 = st.columns(2)
+                with col1:
+                    if categories:
+                        if st.button("Regenerate Categories"):
+                            with st.spinner("Analyzing transcript and generating categories..."):
+                                categories = ai_helper.categorize_transcript(result['transcript'])
+                                db.update_categories(st.session_state.show_transcript_id, categories)
+                                st.success("Categories regenerated successfully!")
+                                st.rerun()
+                    else:
+                        if st.button("Generate Categories"):
+                            with st.spinner("Analyzing transcript and generating categories..."):
+                                categories = ai_helper.categorize_transcript(result['transcript'])
+                                db.update_categories(st.session_state.show_transcript_id, categories)
+                                st.success("Categories generated successfully!")
+                                st.rerun()
+            
+            with stories_tab:
+                st.markdown("### Personal Stories")
+                stories_col1, stories_col2 = st.columns([3, 1])
+                
+                with stories_col2:
+                    if st.button("Extract Stories"):
+                        with st.spinner("Analyzing transcript for personal stories..."):
+                            extraction_result = ai_helper.extract_personal_stories(result['transcript'])
+                            
+                            if extraction_result.get("rate_limited"):
+                                st.error("⚠️ API rate limit reached. Please wait about an hour before trying again.")
+                            else:
+                                stories = extraction_result["stories"]
+                                st.session_state.debug_info = extraction_result["debug"]  # Store debug info
+                                db.update_personal_stories(st.session_state.show_transcript_id, stories)
+                                st.success("Stories extracted successfully!")
+                                st.rerun()
+
+                # Get stories from database
+                stories = db.get_personal_stories(st.session_state.show_transcript_id)
+                
+                if not stories:
+                    st.info("No personal stories have been extracted from this sermon yet. Click 'Extract Stories' to analyze the transcript for personal stories and anecdotes.")
+                else:
+                    st.write(f"Found {len(stories)} stories in the database")
+                    for idx, story in enumerate(stories, 1):
+                        with st.expander(f"📖 {story['title']}", expanded=idx==1):
+                            st.markdown(f"**Summary:** {story['summary']}")
+                            st.markdown(f"**Key Message:** {story['message']}")
+                            if story.get('usage_count', 0) > 1:
+                                st.markdown("---")
+                                st.markdown(f"*This story appears in {story['usage_count']} sermons:*")
+                                for sermon in story['used_in_sermons']:
+                                    st.markdown(f"- {sermon}")
+
+                # Add debug expander
+                with st.expander("🔍 Debug Information"):
+                    st.markdown("### Current Database Stories")
+                    st.json(stories)
+                    
+                    st.markdown("### Latest AI Extraction")
+                    if hasattr(st.session_state, 'debug_info'):
+                        debug = st.session_state.debug_info
+                        
+                        st.markdown("#### Process Information")
+                        st.write(f"- Input Length: {debug['input_length']} characters")
+                        st.write(f"- Number of Story Sections: {debug.get('num_sections', 0)}")
+                        st.write(f"- Stories Found: {debug.get('final_story_count', 0)}")
+                        
+                        if debug.get('errors'):
+                            st.markdown("#### Errors")
+                            for error in debug['errors']:
+                                st.error(error)
+                        
+                        st.markdown("#### Raw AI Response")
+                        st.text(debug.get('ai_response', 'No response available'))
+                        
+                        st.markdown("#### Parsed Stories")
+                        st.json(debug.get('parsed_stories', []))
+                    else:
+                        st.info("No AI extraction data available yet. Click 'Extract Stories' to see the AI response.")
+
+                # Display AI Summary if available
+                st.markdown("### AI Summary")
+                if result.get('ai_summary'):
                     # Remove any prefix text about word count or summary
                     summary = result['ai_summary']
                     summary = summary.replace("Here is a concise summary of the transcript:", "")
@@ -292,6 +454,19 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                         </div>""",
                         unsafe_allow_html=True
                     )
+                else:
+                    st.warning("AI summarization not available.")
+                    if st.button("Generate AI Summary", key="categories_summary_btn"):
+                        with st.spinner("Generating AI summary..."):
+                            summary = ai_helper.generate_summary(result['transcript'])
+                            # Update the database with the new summary
+                            with db.conn.cursor() as cur:
+                                cur.execute(
+                                    "UPDATE transcripts SET ai_summary = %s WHERE video_id = %s",
+                                    (summary, st.session_state.show_transcript_id)
+                                )
+                                db.conn.commit()
+                            st.rerun()
 
                 # Display key statistics
                 st.markdown("### Key Statistics")
@@ -414,28 +589,6 @@ elif st.session_state.current_command == "export":
                 st.info("No data available to export")
         except Exception as e:
             st.error(f"Error exporting data: {str(e)}")
-
-elif st.session_state.current_command == "segments":
-    st.subheader("Time-based Segmentation")
-    transcripts = db.get_all_transcripts()
-    
-    if transcripts:
-        titles = [t['title'] for t in transcripts]
-        selected_title = st.selectbox("Select transcript", titles)
-        
-        selected_transcript = next(t for t in transcripts if t['title'] == selected_title)
-        segment_length = st.slider("Words per segment", 100, 500, 300)
-        
-        segments = parser.extract_time_segments(selected_transcript['transcript'], segment_length)
-        if segments:
-            st.write(f"### Transcript Segments ({len(segments)} total)")
-            for i, segment in enumerate(segments, 1):
-                with st.expander(f"Segment {i}"):
-                    st.write(segment)
-        else:
-            st.info("No segments available")
-    else:
-        st.info("No transcripts available for segmentation")
 
 elif st.session_state.current_command == "total_analysis":
     st.subheader("Total Data Analysis")
