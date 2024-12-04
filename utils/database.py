@@ -19,7 +19,11 @@ class Database:
             raise ValueError("Missing SUPABASE_KEY")
             
         try:
-            print(f"Initializing Supabase client with URL length: {len(self.supabase_url)}, Key length: {len(self.supabase_key)}")
+            # Ensure URL has proper format
+            if not self.supabase_url.startswith('https://'):
+                self.supabase_url = f'https://{self.supabase_url}'
+            
+            print(f"Initializing Supabase client with URL: {self.supabase_url[:8]}...")
             self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
             # Test connection
             self.supabase.auth.get_user()
