@@ -119,3 +119,92 @@ Here's the transcript to analyze:
                 'theology': []
             }
 
+    def extract_personal_stories(self, text: str) -> dict:
+        """Extract personal stories from the transcript."""
+        try:
+            if not text or len(text.strip()) < 100:
+                return {
+                    "stories": [],
+                    "debug": {
+                        "input_length": len(text) if text else 0,
+                        "errors": ["Text too short to process"]
+                    },
+                    "rate_limited": False
+                }
+
+            # Limit text length to prevent token overflow
+            max_chars = 50000
+            if len(text) > max_chars:
+                text = text[:max_chars] + "..."
+
+            # Create prompt for story extraction
+            prompt = """Please analyze this sermon transcript and extract personal stories or anecdotes shared by the speaker. For each story found, provide:
+1. A brief title
+2. A concise summary of the story
+3. The key message or lesson from the story
+
+Format your response as a JSON array of story objects, each with 'title', 'summary', and 'message' fields.
+Example format:
+{
+    "stories": [
+        {
+            "title": "The Lost Sheep",
+            "summary": "A shepherd left his 99 sheep to find one that was lost",
+            "message": "God's love for each individual is personal and pursuing"
+        }
+    ]
+}
+
+Here's the transcript to analyze:
+
+""" + text
+
+            # Generate story analysis using Claude
+            message = self.client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=1024,
+                temperature=0.7,
+                system="You are an expert at analyzing sermon transcripts and identifying personal stories and anecdotes. Extract meaningful stories that illustrate key points.",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+
+            # Parse the response
+            import json
+            import re
+
+            response_text = message.content[0].text
+            # Find JSON-like structure in the response
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if json_match:
+                response_text = json_match.group(0)
+
+            parsed_data = json.loads(response_text)
+
+            # Add debug information
+            debug_info = {
+                "input_length": len(text),
+                "ai_response": response_text,
+                "parsed_stories": parsed_data.get("stories", []),
+                "final_story_count": len(parsed_data.get("stories", [])),
+                "errors": []
+            }
+
+            return {
+                "stories": parsed_data.get("stories", []),
+                "debug": debug_info,
+                "rate_limited": False
+            }
+
+        except Exception as e:
+            print(f"Error extracting stories: {str(e)}")
+            return {
+                "stories": [],
+                "debug": {
+                    "input_length": len(text) if text else 0,
+                    "errors": [str(e)]
+                },
+                "rate_limited": "rate limit" in str(e).lower()
+            }
+
