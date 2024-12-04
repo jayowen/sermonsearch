@@ -122,3 +122,29 @@
     padding: 2px 5px;
     border-radius: 3px;
 }
+/* Category tag styles */
+.stMultiSelect [data-baseweb="tag"] {
+    background-color: #2E7D32 !important;  /* Darker green background */
+    color: #FFFFFF !important;             /* White text */
+    border: none !important;
+    padding: 4px 8px !important;
+    margin: 2px !important;
+    border-radius: 4px !important;
+    font-size: 0.9em !important;
+}
+
+/* Hover state for category tags */
+.stMultiSelect [data-baseweb="tag"]:hover {
+    background-color: #1B5E20 !important;  /* Even darker green on hover */
+}
+
+/* Category tag text */
+.stMultiSelect [data-baseweb="tag"] span {
+    color: #FFFFFF !important;             /* Ensure text is white */
+    font-weight: 500 !important;           /* Slightly bold text */
+}
+
+/* Category tag close button */
+.stMultiSelect [data-baseweb="tag"] button {
+    color: rgba(255, 255, 255, 0.8) !important;  /* Slightly transparent white */
+}
