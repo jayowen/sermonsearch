@@ -110,55 +110,133 @@ parser.register("help", lambda args: parser.get_help(),
                "help - Show available commands")
 
 # Streamlit UI
-st.set_page_config(page_title="YouTube Transcript Processor", layout="wide")
+st.set_page_config(
+    page_title="YouTube Transcript Processor",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Load custom CSS
 with open("styles/custom.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Initialize session state for transcript viewing
+# Initialize session states
 if 'show_transcript_id' not in st.session_state:
     st.session_state.show_transcript_id = None
+if 'current_command' not in st.session_state:
+    st.session_state.current_command = None
 
+# Sidebar
+with st.sidebar:
+    st.title("Commands")
+    
+    # Command buttons
+    if st.button("📺 Process Video", use_container_width=True):
+        st.session_state.current_command = "process-video"
+    if st.button("📑 Process Playlist", use_container_width=True):
+        st.session_state.current_command = "process-playlist"
+    if st.button("🔍 Search Transcripts", use_container_width=True):
+        st.session_state.current_command = "search"
+    if st.button("📋 List All Transcripts", use_container_width=True):
+        st.session_state.current_command = "list"
+    
+    st.markdown("---")
+    with st.expander("ℹ️ Command Help"):
+        st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
+
+# Main content
 st.title("YouTube Transcript Processor")
 
-# Command input
-command = st.text_input("Enter command:", key="command_input",
-                       help="Type 'help' to see available commands")
-
-if command:
-    try:
-        # Parse and execute command
-        handler, args = parser.parse(command)
-        with st.spinner("Processing..."):
-            result = handler(args)
-            
-            if command.startswith("list"):
-                # For list command, directly execute without terminal display
-                result
-            else:
-                # Display result in terminal-style container
+# Command interface
+if st.session_state.current_command == "process-video":
+    st.subheader("Process Single Video")
+    url = st.text_input("Enter YouTube video URL:")
+    if st.button("Process", key="process_video_btn"):
+        if url:
+            with st.spinner("Processing video..."):
+                result = process_video(url)
                 st.markdown(
-                    f"""
-                    <div class="terminal-container">
-                        <div class="command-input">> {command}</div>
+                    f"""<div class="terminal-container">
                         <pre>{result}</pre>
-                    </div>
-                    """,
+                    </div>""",
                     unsafe_allow_html=True
                 )
-    except Exception as e:
-        st.error(f"Error: {str(e)}")
+        else:
+            st.warning("Please enter a video URL")
 
-# Handle transcript viewing from session state
+elif st.session_state.current_command == "process-playlist":
+    st.subheader("Process Playlist")
+    url = st.text_input("Enter YouTube playlist URL:")
+    if st.button("Process", key="process_playlist_btn"):
+        if url:
+            with st.spinner("Processing playlist..."):
+                result = process_playlist(url)
+                st.markdown(
+                    f"""<div class="terminal-container">
+                        <pre>{result}</pre>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+        else:
+            st.warning("Please enter a playlist URL")
+
+elif st.session_state.current_command == "search":
+    st.subheader("Search Transcripts")
+    query = st.text_input("Enter search query:")
+    if st.button("Search", key="search_btn"):
+        if query:
+            with st.spinner("Searching..."):
+                results = db.search_transcripts(query)
+                if results:
+                    for result in results:
+                        video_url = f"https://youtube.com/watch?v={result['video_id']}"
+                        st.markdown(
+                            f"""<div class="search-result">
+                                <a href="{video_url}" target="_blank" class="video-link">{result['title']}</a>
+                                <p class="highlight-text">{result['highlight']}</p>
+                            </div>""",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.info("No results found")
+        else:
+            st.warning("Please enter a search query")
+
+elif st.session_state.current_command == "list":
+    st.subheader("All Transcripts")
+    transcripts = db.get_all_transcripts()
+    
+    if not transcripts:
+        st.info("No transcripts stored")
+    else:
+        for t in transcripts:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(
+                    f"""<div class="command-card">
+                        <div class="command-title">{t['title']}</div>
+                        <div class="command-description">Added: {t['created_at'].strftime('%Y-%m-%d %H:%M')}</div>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+            with col2:
+                if st.button("View", key=f"btn_{t['video_id']}"):
+                    st.session_state.show_transcript_id = t['video_id']
+                    st.rerun()
+
+# Handle transcript viewing
 if st.session_state.show_transcript_id:
     with st.spinner("Loading transcript..."):
-        transcript = get_transcript(st.session_state.show_transcript_id)
-        st.markdown(transcript)
+        transcript_text = get_transcript(st.session_state.show_transcript_id)
+        st.markdown(
+            f"""<div class="transcript-viewer">
+                {transcript_text}
+            </div>""",
+            unsafe_allow_html=True
+        )
         if st.button("Close Transcript"):
             st.session_state.show_transcript_id = None
             st.rerun()
-
-# Help section
-with st.expander("Available Commands"):
-    st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
+else:
+    if not st.session_state.current_command:
+        st.info("👈 Select a command from the sidebar to get started")
