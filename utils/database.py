@@ -25,13 +25,19 @@ class Database:
             
             print(f"Initializing Supabase client with URL: {self.supabase_url[:8]}...")
             self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
-            # Test connection
-            self.supabase.auth.get_user()
+            
+            # Test connection by trying to fetch one row from transcripts
+            print("Testing Supabase connection with a sample query...")
+            test_result = self.supabase.table('transcripts').select('*').limit(1).execute()
+            print(f"Connection test result: {test_result.data if hasattr(test_result, 'data') else 'No data attribute'}")
+            
             print("Successfully initialized Supabase client and verified connection")
         except Exception as e:
             print(f"Error initializing Supabase client: {str(e)}")
             if hasattr(e, 'response'):
                 print(f"Response details: {e.response}")
+            if hasattr(e, '__dict__'):
+                print(f"Error details: {e.__dict__}")
             raise
 
     def insert_transcript(self, video_id: str, title: str, transcript: str) -> Optional[str]:
@@ -106,16 +112,27 @@ class Database:
     def get_all_transcripts(self) -> List[Dict[str, Any]]:
         """Get all transcripts."""
         try:
-            result = self.supabase.table('transcripts').select('*').order('created_at.desc').execute()
-            if not result.data:
-                print("No transcripts found in database")
+            print("Attempting to fetch transcripts from Supabase...")
+            result = self.supabase.table('transcripts').select('*').execute()
+            
+            if result and hasattr(result, 'data'):
+                if not result.data:
+                    print("No transcripts found in Supabase database")
+                    return []
+                print(f"Successfully retrieved {len(result.data)} transcripts from Supabase")
+                return result.data
+            else:
+                print("Invalid response format from Supabase")
+                if result:
+                    print(f"Response structure: {dir(result)}")
                 return []
-            print(f"Successfully retrieved {len(result.data)} transcripts")
-            return result.data
+                
         except Exception as e:
             print(f"Error getting all transcripts: {str(e)}")
             if hasattr(e, 'response'):
                 print(f"Response details: {e.response}")
+            if hasattr(e, '__dict__'):
+                print(f"Error details: {e.__dict__}")
             return []
 
     def search_transcripts(self, query: str) -> List[Dict[str, Any]]:
