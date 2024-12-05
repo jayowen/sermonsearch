@@ -314,3 +314,51 @@ class Database:
             if hasattr(e, '__dict__'):
                 print(f"Error details: {e.__dict__}")
             return False
+    def delete_transcript(self, transcript_id: int) -> bool:
+        """Delete a transcript and all its related data."""
+        try:
+            print(f"Deleting transcript and related data for transcript_id: {transcript_id}")
+            
+            # Get the transcript first to verify it exists
+            result = self.supabase.table('transcripts').select('*').eq('id', transcript_id).execute()
+            if not result.data:
+                print(f"No transcript found for transcript_id: {transcript_id}")
+                return False
+                
+            print(f"Found transcript with id: {transcript_id}")
+            
+            try:
+                # Delete in order of dependencies
+                # 1. Delete transcript_stories relationships
+                stories_result = self.supabase.table('transcript_stories').delete().eq('transcript_id', transcript_id).execute()
+                print("Deleted transcript_stories relationships:", stories_result.data if hasattr(stories_result, 'data') else 'No data')
+                
+                # 2. Delete categories
+                categories_result = self.supabase.table('categories').delete().eq('transcript_id', transcript_id).execute()
+                print("Deleted categories:", categories_result.data if hasattr(categories_result, 'data') else 'No data')
+                
+                # 3. Finally delete the transcript itself
+                transcript_result = self.supabase.table('transcripts').delete().eq('id', transcript_id).execute()
+                print("Delete transcript result:", transcript_result.data if hasattr(transcript_result, 'data') else 'No data')
+                
+                success = bool(transcript_result.data)
+                if success:
+                    print(f"Successfully deleted transcript and related data for transcript_id: {transcript_id}")
+                else:
+                    print(f"Failed to delete transcript for transcript_id: {transcript_id}")
+                
+                return success
+                
+            except Exception as inner_e:
+                print(f"Error during deletion process: {str(inner_e)}")
+                if hasattr(inner_e, 'response'):
+                    print(f"Response details: {inner_e.response}")
+                return False
+                
+        except Exception as e:
+            print(f"Error in delete_transcript: {str(e)}")
+            if hasattr(e, 'response'):
+                print(f"Response details: {e.response}")
+            if hasattr(e, '__dict__'):
+                print(f"Error details: {e.__dict__}")
+            return False

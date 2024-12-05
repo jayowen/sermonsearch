@@ -33,13 +33,26 @@ class AIHelper:
                 model="claude-3-haiku-20240307",
                 max_tokens=1024,
                 temperature=0.7,
-                system="You are an expert at summarizing video transcripts. Focus on extracting key points and main ideas. Be concise and highlight the most important information.",
+                system="You are an expert at summarizing video transcripts. Focus on extracting key points and main ideas. Be concise and highlight the most important information. Provide only the summary text without any prefixes or explanatory text.",
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
             )
             
-            return message.content[0].text
+            summary = message.content[0].text
+            # Remove any common prefixes that might appear
+            prefixes_to_remove = [
+                "Here is a concise summary of the transcript:",
+                "Here is a summary of the key points from the transcript:",
+                "Here's a summary of the transcript:",
+                "Summary:",
+                "Here is a summary:"
+            ]
+            for prefix in prefixes_to_remove:
+                if summary.startswith(prefix):
+                    summary = summary[len(prefix):].strip()
+            
+            return summary
             
         except Exception as e:
             print(f"Error generating AI summary: {str(e)}")
@@ -142,9 +155,28 @@ Here's the transcript to analyze:
                 'errors': []
             }
             
+            # Try to extract JSON from the response
             try:
-                # First try direct JSON parsing
-                categories = json.loads(response_text)
+                # Find the first occurrence of '{'
+                json_start = response_text.find('{')
+                if json_start != -1:
+                    # Find the matching closing brace
+                    count = 1
+                    json_end = json_start + 1
+                    while count > 0 and json_end < len(response_text):
+                        if response_text[json_end] == '{':
+                            count += 1
+                        elif response_text[json_end] == '}':
+                            count -= 1
+                        json_end += 1
+                    
+                    if count == 0:
+                        json_str = response_text[json_start:json_end]
+                        categories = json.loads(json_str)
+                    else:
+                        raise json.JSONDecodeError("No valid JSON object found", response_text, 0)
+                else:
+                    raise json.JSONDecodeError("No JSON object found", response_text, 0)
             except json.JSONDecodeError as e:
                 # If direct parsing fails, try to extract JSON structure
                 json_match = re.search(r'\{[\s\S]*?\}(?=\s*$)', response_text)
@@ -250,15 +282,28 @@ Here's the sermon transcript to analyze:
             try:
                 # First try direct JSON parsing
                 parsed_data = json.loads(response_text)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 # If direct parsing fails, try to extract JSON structure
                 json_match = re.search(r'\{[\s\S]*?\}(?=\s*$)', response_text)
                 if json_match:
                     try:
                         parsed_data = json.loads(json_match.group(0))
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as nested_e:
+                        debug_info["errors"].append({
+                            "error_type": "JSON Parse Error",
+                            "message": str(nested_e),
+                            "context": response_text[:100] + "..." if len(response_text) > 100 else response_text,
+                            "position": nested_e.pos,
+                            "line_number": nested_e.lineno if hasattr(nested_e, 'lineno') else None
+                        })
                         parsed_data = {"stories": []}
                 else:
+                    debug_info["errors"].append({
+                        "error_type": "JSON Structure Error",
+                        "message": str(e),
+                        "context": response_text[:100] + "..." if len(response_text) > 100 else response_text,
+                        "raw_response": response_text
+                    })
                     parsed_data = {"stories": []}
 
             # Ensure we have a valid stories array
