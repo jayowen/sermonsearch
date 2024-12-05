@@ -29,31 +29,78 @@ def process_single_video(video_id: str, title: str = None, no_redirect: bool = F
             video_info = youtube.get_video_info(video_id)
             title = video_info['title']
 
-        # Generate AI summary with progress indicator
-        with st.spinner("Generating AI summary..."):
+        # Generate AI analysis (summary, categories, and stories) with progress indicator
+        with st.spinner("Analyzing transcript with AI..."):
             try:
+                # Step 1: Generate summary
                 summary = ai_helper.generate_summary(transcript)
-                st.write("✓ AI summary generated successfully")
-            except Exception as e:
-                st.error(f"Error generating AI summary: {str(e)}")
-                summary = None
-        
-        # Generate categories with progress indicator
-        with st.spinner("Analyzing transcript and generating categories..."):
-            try:
+                if summary:
+                    summary = summary.strip()
+                    st.success("✓ AI summary generated successfully")
+                    st.info("Summary length: " + str(len(summary)) + " characters")
+                    with st.expander("Preview Summary"):
+                        st.markdown(summary)
+                else:
+                    st.warning("No summary was generated - the transcript might be too short or empty")
+                    summary = None
+
+                # Step 2: Generate categories
                 categories = ai_helper.categorize_transcript(transcript)
-                st.write("✓ Categories generated successfully")
+                if categories:
+                    st.success("✓ Categories generated successfully")
+                    with st.expander("Preview Categories"):
+                        st.write(categories)
+                else:
+                    st.warning("No categories were generated")
+                    categories = None
+
+                # Step 3: Extract stories
+                stories = ai_helper.extract_personal_stories(transcript)
+                if stories.get("stories"):
+                    st.success("✓ Personal stories extracted successfully")
+                    with st.expander("Preview Stories"):
+                        st.write(f"Found {len(stories['stories'])} stories")
+                else:
+                    st.warning("No personal stories were found")
+                    stories = {"stories": []}
+
             except Exception as e:
-                st.error(f"Error generating categories: {str(e)}")
+                error_msg = str(e)
+                st.error(f"Error in AI analysis: {error_msg}")
+                if "rate limit" in error_msg.lower():
+                    st.warning("⚠️ API rate limit reached. Please try again in a few minutes.")
+                elif "api key" in error_msg.lower():
+                    st.error("❌ API key configuration issue. Please check your ANTHROPIC_API_KEY.")
+                summary = None
                 categories = None
+                stories = {"stories": []}
             
         # Insert transcript with summary and get the ID
         transcript_id = db.insert_transcript(video_id, title, transcript)
         if transcript_id:
-            # Update categories and summary
-            db.update_categories(video_id, categories)
-            db.update_transcript_summary(video_id, summary)
-            st.success("Transcript processed, categorized, and summarized successfully!")
+            # Update all generated data with progress tracking
+            with st.spinner("Saving data to database..."):
+                success_count = 0
+                total_operations = 3  # summary, categories, and stories
+                
+                if summary and db.update_transcript_summary(video_id, summary):
+                    success_count += 1
+                    st.write("✓ Summary saved")
+                    
+                if categories and db.update_categories(video_id, categories):
+                    success_count += 1
+                    st.write("✓ Categories saved")
+                    
+                if stories["stories"] and db.update_personal_stories(video_id, stories["stories"]):
+                    success_count += 1
+                    st.write("✓ Personal stories saved")
+                
+                if success_count == total_operations:
+                    st.success("🎉 Transcript fully processed with summary, categories, and stories!")
+                elif success_count > 0:
+                    st.warning(f"Transcript processed but only {success_count} out of {total_operations} updates were completed")
+                else:
+                    st.error("Failed to save transcript data")
             
             # Only update state and redirect if not processing a playlist
             if not no_redirect:
@@ -114,7 +161,7 @@ ai_helper = AIHelper()  # Create an AIHelper instance
 
 # Initialize session state
 if 'current_command' not in st.session_state:
-    st.session_state.current_command = None
+    st.session_state.current_command = "list"  # Default to list view
 if 'show_transcript_id' not in st.session_state:
     st.session_state.show_transcript_id = None
 
@@ -126,7 +173,7 @@ except Exception as e:
     st.error(f"Error loading styles: {str(e)}")
 
 # Main content wrapper
-st.markdown('<div class="main-content">', unsafe_allow_html=True)
+st.markdown('<div class="main-content" style="margin-top: -3rem;">', unsafe_allow_html=True)
 
 # Sidebar navigation
 with st.sidebar:
@@ -150,8 +197,6 @@ with st.sidebar:
     if st.button("💾 Export Data", use_container_width=True):
         st.session_state.current_command = "export"
     st.markdown("---")
-    with st.expander("ℹ️ Command Help"):
-        st.markdown(parser.get_help().replace("\n", "<br>"), unsafe_allow_html=True)
 
 # Main content area
 if st.session_state.current_command == "add_videos":
@@ -273,36 +318,118 @@ elif st.session_state.current_command == "search":
             st.write(f"Found {len(results)} results:")
             for result in results:
                 with st.expander(result['title']):
-                    st.markdown(f"""<div class="search-result">{result['highlight']}</div>""", 
-                              unsafe_allow_html=True)
+                    sentences = processor.get_sentences_with_timestamps(result['transcript'])
+                    search_term = query.lower()
+                    
+                    for sentence, timestamp in sentences:
+                        if search_term in sentence.lower():
+                            video_time = int(float(timestamp))
+                            youtube_link = f"https://www.youtube.com/watch?v={result['video_id']}&t={video_time}"
+                            
+                            # Format the timestamp as MM:SS
+                            minutes = video_time // 60
+                            seconds = video_time % 60
+                            time_str = f"{minutes:02d}:{seconds:02d}"
+                            
+                            st.markdown(f"""
+                            <div class="search-result">
+                                <small>🕒 {time_str}</small><br>
+                                {sentence}<br>
+                                <a href="{youtube_link}" target="_blank">Watch this part on YouTube ▶️</a>
+                            </div>
+                            """, unsafe_allow_html=True)
         else:
             st.info("No matching transcripts found")
 
 elif st.session_state.current_command == "list":
-    st.subheader("All Transcripts")
+    st.markdown('<h3 style="margin-top: -1rem;">All Transcripts</h3>', unsafe_allow_html=True)
     transcripts = db.get_all_transcripts()
     
     if transcripts:
-        # Create a grid layout
-        cols = st.columns(3)
-        for idx, t in enumerate(transcripts):
-            with cols[idx % 3]:
-                st.markdown(
-                    f"""<div class="video-card">
-                        <div class="video-thumbnail">
-                            <img src="https://img.youtube.com/vi/{t['video_id']}/mqdefault.jpg" alt="Video thumbnail">
-                        </div>
-                        <div class="video-info">
-                            <h3>{t['title']}</h3>
-                            <p>Added: {t['created_at'][:19] if isinstance(t['created_at'], str) else t['created_at'].strftime('%Y-%m-%d %H:%M:%S')}</p>
-                        </div>
-                        </div>""",
-                    unsafe_allow_html=True
-                )
-                if st.button("View Details", key=f"btn_{t['video_id']}", use_container_width=True):
-                    st.session_state.show_transcript_id = t['video_id']
-                    st.session_state.current_command = "view_video"
-                    st.rerun()
+        # Add view toggle with better alignment
+        if 'view_mode' not in st.session_state:
+            st.session_state.view_mode = 'list'
+            
+        st.markdown('<div class="view-toggle-container">', unsafe_allow_html=True)
+        if st.button('📋', key='view_toggle', help="Switch to list view"):
+            st.session_state.view_mode = 'list'
+            st.rerun()
+        if st.button('📑', key='grid_toggle', help="Switch to grid view"):
+            st.session_state.view_mode = 'grid'
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if st.session_state.view_mode == 'grid':
+            # Grid View
+            cols = st.columns(3)
+            for idx, t in enumerate(transcripts):
+                with cols[idx % 3]:
+                    st.markdown(
+                        f"""<div class="video-card">
+                            <div class="video-thumbnail">
+                                <img src="https://img.youtube.com/vi/{t['video_id']}/mqdefault.jpg" alt="Video thumbnail">
+                            </div>
+                            <div class="video-info">
+                                <h3>{t['title']}</h3>
+                                <p>Added: {t['created_at'][:19] if isinstance(t['created_at'], str) else t['created_at'].strftime('%Y-%m-%d %H:%M:%S')}</p>
+                            </div>
+                            </div>""",
+                        unsafe_allow_html=True
+                    )
+                    st.markdown('<div class="action-buttons-container">', unsafe_allow_html=True)
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        if st.button("View Details", key=f"btn_view_{t['video_id']}", use_container_width=True):
+                            st.session_state.show_transcript_id = t['video_id']
+                            st.session_state.current_command = "view_video"
+                            st.rerun()
+                    with col2:
+                        if not st.session_state.get(f"confirm_delete_{t['id']}", False):
+                            st.markdown('<div class="delete-button">', unsafe_allow_html=True)
+                            if st.button("🗑️", key=f"btn_del_{t['id']}", help="Delete transcript"):
+                                st.session_state[f"confirm_delete_{t['id']}"] = True
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div class="delete-button">', unsafe_allow_html=True)
+                            if st.button("⚠️", key=f"btn_confirm_{t['id']}", help="Confirm deletion"):
+                                if db.delete_transcript(t['id']):
+                                    st.success("Deleted!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete")
+                            st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # List View
+            for t in transcripts:
+                with st.container():
+                    cols = st.columns([1, 4, 2, 1])
+                    with cols[0]:
+                        st.image(f"https://img.youtube.com/vi/{t['video_id']}/default.jpg", use_container_width=True)
+                    with cols[1]:
+                        st.markdown(f"**{t['title']}**")
+                        st.caption(f"Added: {t['created_at'][:19] if isinstance(t['created_at'], str) else t['created_at'].strftime('%Y-%m-%d %H:%M:%S')}")
+                    with cols[2]:
+                        if st.button("View Details", key=f"list_view_{t['video_id']}", use_container_width=True):
+                            st.session_state.show_transcript_id = t['video_id']
+                            st.session_state.current_command = "view_video"
+                            st.rerun()
+                    with cols[3]:
+                        st.markdown('<div class="delete-button">', unsafe_allow_html=True)
+                        if not st.session_state.get(f"confirm_delete_{t['id']}", False):
+                            if st.button("🗑️", key=f"list_del_{t['id']}", use_container_width=True):
+                                st.session_state[f"confirm_delete_{t['id']}"] = True
+                                st.rerun()
+                        else:
+                            if st.button("⚠️", key=f"list_confirm_{t['id']}", use_container_width=True):
+                                if db.delete_transcript(t['id']):
+                                    st.success("Deleted!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    st.divider()
     else:
         st.info("No transcripts found in database")
 
@@ -436,7 +563,7 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                 col1, col2 = st.columns(2)
                 with col1:
                     if categories:
-                        if st.button("🤖 Generate Categories with AI"):
+                        if st.button("⚡ Generate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
                                 try:
                                     ai_response = ai_helper.categorize_transcript(result['transcript'])
@@ -464,7 +591,7 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                                         'errors': [str(e)]
                                     }
                     else:
-                        if st.button("🤖 Generate Categories with AI"):
+                        if st.button("⚡ Generate Categories"):
                             with st.spinner("Analyzing transcript and generating categories..."):
                                 try:
                                     ai_response = ai_helper.categorize_transcript(result['transcript'])
@@ -548,6 +675,24 @@ elif st.session_state.current_command == "view_video" and st.session_state.show_
                         st.info("No AI extraction data available yet. Click 'Extract Stories' to see the AI response.")
 
                 # Display AI Summary if available
+            with edit_tab:
+                st.markdown("### Edit Options")
+                
+                # Add delete functionality with confirmation
+                st.markdown("#### Delete Transcript")
+                st.warning("⚠️ This action cannot be undone. All related data including categories and stories will be deleted.")
+                
+                if st.button("🗑️ Delete Transcript"):
+                    if st.button("⚠️ Click again to confirm deletion"):
+                        # Delete the transcript and related data
+                        if db.delete_transcript(int(st.session_state.show_transcript_id)):
+                            st.success("Transcript and related data deleted successfully!")
+                            # Clear the session state and return to list view
+                            st.session_state.show_transcript_id = None
+                            st.session_state.current_command = "list"
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete transcript. Please try again.")
                 st.markdown("### AI Summary")
                 if result.get('ai_summary'):
                     # Remove any prefix text about word count or summary
